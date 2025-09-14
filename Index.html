@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance MIS Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        .gradient-box {
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .gradient-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .gradient-box.active {
+            transform: translateY(-2px) scale(0.98);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border-color: #3b82f6; /* A blue border to indicate selection */
+        }
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; transition: opacity 0.3s ease;
+        }
+        .spinner {
+            border: 5px solid #e2e8f0; border-top: 5px solid #3b82f6; border-radius: 50%;
+            width: 50px; height: 50px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #task-details-section {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.7s ease-in-out, padding 0.5s ease-in-out, margin-top 0.5s ease-in-out;
+            padding: 0;
+            margin-top: 0;
+        }
+        #task-details-section.expanded {
+            max-height: 2000px; /* Large enough for content + pagination */
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        #info-tooltip {
+            position: absolute; display: none; background-color: #1e293b; color: white;
+            padding: 8px 12px; border-radius: 6px; font-size: 12px; z-index: 10000;
+            pointer-events: none; max-width: 250px;
+            transform: translateX(-50%); /* Center the tooltip */
+        }
+        .info-tooltip-arrow {
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid #1e2b3b;
+        }
+        
+        /* Calendar Theme */
+        #calendar-wrapper {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        .fc {
+            --fc-border-color: transparent;
+            --fc-today-bg-color: rgba(239, 68, 68, 0.08);
+        }
+         #small-calendar .fc-header-toolbar {
+            background: linear-gradient(90deg, #f97316, #ef4444);
+            color: white;
+            padding: 1rem;
+        }
+        #small-calendar .fc-toolbar-title {
+            color: white;
+            font-size: 1.125rem;
+        }
+        #small-calendar .fc-button {
+             background-color: rgba(255,255,255,0.1) !important;
+             border: 1px solid rgba(255,255,255,0.2) !important;
+             color: white !important;
+             box-shadow: none !important;
+             transition: background-color 0.2s;
+             padding: 0.2rem !important;
+        }
+        #small-calendar .fc-button .fc-icon {
+            font-size: 1em;
+        }
+        #small-calendar .fc-button:hover {
+            background-color: rgba(255,255,255,0.2) !important;
+        }
+
+        .fc .fc-daygrid-day { 
+            cursor: pointer; 
+            transition: background-color 0.2s; 
+            aspect-ratio: 1 / 1;
+            height: auto !important;
+        }
+        .fc .fc-daygrid-day:hover { background-color: rgba(239, 68, 68, 0.05); }
+        .fc-daygrid-day-events {
+             display: flex; justify-content: center; align-items: center; min-height: 1.2em;
+        }
+        .fc .fc-daygrid-day-top { justify-content: center; }
+        #small-calendar .fc-daygrid-day-number { font-size: 0.75em; }
+        #small-calendar .fc-day-header { font-size: 0.7em; }
+        #small-calendar { height: auto; }
+
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-fade-in-up { animation: fade-in-up 0.5s ease-out forwards; }
+        .category-box-animate {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fade-in-up 0.5s ease-out forwards;
+        }
+
+        /* Modal Redesign */
+        .modal-content {
+             animation: fade-in-up 0.4s ease-out forwards;
+        }
+
+        /* Print styles */
+        @media print {
+            body * { visibility: hidden; }
+            #worklist-section-printable, #worklist-section-printable * { visibility: visible; }
+            #worklist-section-printable { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%;
+                font-size: 10pt;
+                padding: 1rem;
+            }
+             #worklist-section-printable h3 {
+                background: none !important;
+                -webkit-print-color-adjust: exact !important;
+                color: black !important;
+             }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="password-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-[10000] p-4">
+        <div class="bg-white p-8 rounded-lg shadow-2xl text-center w-full max-w-sm animate-fade-in-up">
+            <img src="https://www.itvoice.in/wp-content/uploads/2022/12/Background.webp" alt="Company Logo" class="mx-auto h-10 mb-4 object-contain">
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Compliance Portal</h2>
+            <p class="text-slate-500 mb-4">Please enter the password to continue.</p>
+            <form id="password-form">
+                <input type="password" id="password-input" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Password">
+                <p id="password-error" class="text-red-500 text-sm mt-2 h-5"></p>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg mt-4 transition duration-300">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="loader-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p id="loader-text" class="mt-4 text-lg text-slate-600 font-medium">Loading Dashboard...</p>
+        <div class="w-64 bg-slate-200 rounded-full h-2.5 mt-4">
+            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+    </div>
+    <div id="info-tooltip"><div class="info-tooltip-arrow"></div><span id="info-tooltip-text"></span></div>
+    
+    <div id="event-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[10001] hidden p-4">
+        <div class="modal-content bg-slate-50 p-0 rounded-xl shadow-xl w-full max-w-2xl relative">
+            <div id="modal-header" class="flex justify-between items-center p-4 bg-white rounded-t-xl">
+                <h3 id="modal-title" class="text-lg font-bold text-slate-800 flex items-center gap-3"></h3>
+                 <button id="close-modal" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition">&times;</button>
+            </div>
+            <div id="modal-body" class="p-6 space-y-4 text-slate-600 max-h-[60vh] overflow-y-auto">
+                <!-- Content will be injected by JS -->
+            </div>
+        </div>
+    </div>
+    
+    <div class="container mx-auto p-4 md:p-6 lg:p-8 hidden">
+        <header class="flex flex-col items-center mb-6">
+            <img src="https://www.itvoice.in/wp-content/uploads/2022/12/Background.webp" alt="Logo" class="h-8 sm:h-10 object-contain mb-4">
+            <div class="w-full flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-center w-full md:w-auto md:text-left">
+                    <h1 class="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-amber-500 via-orange-600 to-red-600 bg-clip-text text-transparent">Compliance Dashboard</h1>
+                    <div class="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-2 text-slate-500 mt-1 text-xs sm:text-sm md:text-base">
+                        <span class="hidden sm:inline">Compliance Overview for:</span>
+                        <select id="company-filter" class="bg-slate-100 border-transparent text-slate-900 font-medium rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto p-1"></select>
+                    </div>
+                </div>
+                <div class="flex flex-row items-center justify-center md:justify-end gap-2 w-full md:w-auto">
+                    <select id="fy-filter" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto p-2.5 shadow-sm">
+                        <option value="all">All FY</option>
+                    </select>
+                    <button id="refresh-btn" class="bg-slate-200 text-slate-800 font-bold p-2.5 rounded-lg hover:bg-slate-300 transition flex items-center justify-center" title="Refresh Data">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V4a1 1 0 011-1zm12 8a1 1 0 011 1v2.101a7.002 7.002 0 01-11.601 2.566 1 1 0 111.885.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1z" clip-rule="evenodd" /></svg>
+                   </button>
+                   <div class="relative">
+                        <button id="support-btn" class="bg-slate-200 text-slate-800 font-bold p-2.5 rounded-lg hover:bg-slate-300 transition flex items-center justify-center" title="Contact Support">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5h-1A15.5 15.5 0 012 3.5v-1z" /></svg>
+                        </button>
+                        <div id="support-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 hidden origin-top-right transition-all duration-200 ease-out">
+                            <div class="py-1">
+                                <a href="https://wa.me/919810710398" target="_blank" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                    <svg class="w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.894 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.433-9.89-9.889-9.89-5.452 0-9.887 4.428-9.888 9.891.001 2.03.601 3.996 1.742 5.718l-1.21 4.363 4.646-1.219z"/></svg>
+                                    WhatsApp
+                                </a>
+                                <a href="tel:9810710398" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                     <svg class="w-5 h-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5h-1A15.5 15.5 0 012 3.5v-1z" /></svg>
+                                    Call Us
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                     <button id="logout-btn" class="bg-slate-200 text-slate-800 font-bold py-2 px-3 rounded-lg hover:bg-slate-300 transition flex items-center justify-center" title="Logout">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M6 10a.75.75 0 01.75-.75h9.546l-1.048-.943a.75.75 0 111.004-1.114l2.5 2.25a.75.75 0 010 1.114l-2.5 2.25a.75.75 0 11-1.004-1.114l1.048-.943H6.75A.75.75 0 016 10z" clip-rule="evenodd" /></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main id="main-content">
+            <div id="dashboard-content" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 space-y-8">
+                        <section id="category-section">
+                            <div id="category-boxes" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+                        </section>
+                        <section id="task-details-section" class="bg-white rounded-2xl shadow-lg"></section>
+                        <div id="charts-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                    </div>
+                    <div class="lg:col-span-1 space-y-8">
+                        <div class="bg-white p-4 rounded-2xl shadow-lg">
+                            <div id="worklist-section"></div>
+                        </div>
+                        <div id="calendar-wrapper">
+                            <div id="small-calendar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <div id="worklist-section-printable" class="hidden"></div>
+
+<script type="module">
+    import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        const passwordForm = document.getElementById('password-form');
+        passwordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const passwordInput = document.getElementById('password-input');
+            if (passwordInput.value === 'Boltt@2025') {
+                const passwordOverlay = document.getElementById('password-overlay');
+                passwordOverlay.style.transition = 'opacity 0.5s ease';
+                passwordOverlay.style.opacity = '0';
+                setTimeout(() => passwordOverlay.style.display = 'none', 500);
+                document.querySelector('.container').classList.remove('hidden');
+                startApp();
+            } else {
+                const passwordError = document.getElementById('password-error');
+                passwordError.textContent = 'Incorrect password.';
+                setTimeout(() => passwordError.textContent = '', 3000);
+            }
+        });
+    });
+
+function startApp() {
+    const API_KEY = ""; // PASTE YOUR GEMINI API KEY HERE
+
+    const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycby_pWCC3d4aaxBE34IZwT7ibaJl5J7fCybX1ritzwf9ufoc3_FTWBTciRQiPjsfpgjM/exec';
+    if (!GOOGLE_SHEET_URL) {
+        document.body.innerHTML = `<div class="p-8 text-center text-red-500">Error: Google Sheet URL is not configured.</div>`;
+        return;
+    }
+    
+    const loader = document.getElementById('loader-overlay');
+    const loaderText = document.getElementById('loader-text');
+    const progressBar = document.getElementById('progress-bar');
+    const fyFilter = document.getElementById('fy-filter');
+    const companyFilter = document.getElementById('company-filter');
+    const categoryBoxesContainer = document.getElementById('category-boxes');
+    const chartsContainer = document.getElementById('charts-container');
+    const tooltip = document.getElementById('info-tooltip');
+    const tooltipText = document.getElementById('info-tooltip-text');
+    const taskDetailsSection = document.getElementById('task-details-section');
+    const worklistSection = document.getElementById('worklist-section');
+
+    // General Modal Elements
+    const eventModal = document.getElementById('event-modal');
+    const closeModalBtn = document.getElementById('close-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    
+    const refreshBtn = document.getElementById('refresh-btn');
+    const supportBtn = document.getElementById('support-btn');
+    const supportDropdown = document.getElementById('support-dropdown');
+    const logoutBtn = document.getElementById('logout-btn');
+
+
+    let allComplianceData = [], smallCalendarInstance, genAI, aiModel;
+    let currentTaskDataForPagination = [];
+    
+    const categoryColors = {
+        'default': 'border-slate-500', 'GST': 'border-blue-500', 'Income Tax': 'border-green-500',
+        'ROC': 'border-purple-500', 'Labour Law': 'border-orange-500',
+    };
+    const getCategoryColor = (category, type = 'border') => {
+        const colorClass = categoryColors[category] || categoryColors['default'];
+        if (type === 'bg') return colorClass.replace('border', 'bg');
+        return colorClass;
+    };
+    
+
+    if (API_KEY) {
+        try {
+            genAI = new GoogleGenerativeAI(API_KEY);
+            aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        } catch(e) { console.error("AI Init Error:", e); }
+    }
+
+    const showLoader = () => { loader.style.display = 'flex'; loader.style.opacity = 1; };
+    const hideLoader = () => {
+        loader.style.opacity = 0;
+        setTimeout(() => {
+            loader.style.display = 'none';
+            updateProgress(0, 'Loading Dashboard...'); // Reset for next time
+        }, 300);
+    };
+
+    const updateProgress = (percentage, text) => {
+        if (progressBar) progressBar.style.width = `${percentage}%`;
+        if (loaderText && text) loaderText.textContent = text;
+    };
+
+    const safeParseDate = (dateString) => {
+        if (!dateString || typeof dateString !== 'string') return null;
+        const date = new Date(`${dateString.split('T')[0]}T12:00:00Z`);
+        return isNaN(date.getTime()) ? null : date;
+    };
+
+    const safeFormatDate = (date) => date ? date.toLocaleDateString('en-GB', { timeZone: 'UTC' }) : 'N/A';
+    const formatPeriod = (dateString) => {
+        if (!dateString) return "N/A";
+        if (/^[a-zA-Z]+ \d{4}$/.test(dateString.trim())) return dateString.trim();
+        const date = safeParseDate(dateString);
+        return date ? `${date.toLocaleString('default', { month: 'short', timeZone: 'UTC' })} ${date.getUTCFullYear()}` : 'N/A';
+    };
+
+    const fetchData = async () => {
+        try {
+            updateProgress(10, 'Fetching data from source...');
+            const response = await fetch(`${GOOGLE_SHEET_URL}?sheet=ComplianceData`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            updateProgress(50, 'Processing data...');
+            
+            return data.map((row, index) => {
+                const newRow = { rowIndex: index + 2 };
+                for (const key in row) {
+                    const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '');
+                    newRow[normalizedKey] = row[key];
+                }
+
+                const adjustDate = (dateStr) => {
+                    if (!dateStr || typeof dateStr !== 'string') return dateStr;
+                    const parts = dateStr.split('T')[0].split('-');
+                    if (parts.length === 3) {
+                        const originalDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+                        if (!isNaN(originalDate.getTime())) {
+                            originalDate.setUTCDate(originalDate.getUTCDate() + 1);
+                            return originalDate.toISOString().split('T')[0];
+                        }
+                    }
+                    return dateStr;
+                };
+                
+                newRow.duedate = adjustDate(newRow.duedate);
+                newRow.period = adjustDate(newRow.period);
+
+                return newRow;
+            });
+        } catch (error) { console.error(`Fetch Error:`, error); return null; }
+    };
+
+    const initializeDashboard = async () => {
+        showLoader();
+        allComplianceData = await fetchData();
+        if (!allComplianceData) { 
+            hideLoader(); 
+            categoryBoxesContainer.innerHTML = `<div class="col-span-full text-center p-8 bg-white rounded-lg shadow">Failed to load compliance data.</div>`;
+            return;
+        }
+        updateProgress(75, 'Building dashboard...');
+        populateCompanyFilter();
+        populateFyFilter();
+        initializeSmallCalendar();
+        buildUI();
+        setupEventListeners();
+        updateProgress(100, 'Done!');
+        setTimeout(hideLoader, 300);
+    };
+    
+    const setupEventListeners = () => {
+        fyFilter.addEventListener('change', () => buildUI());
+        companyFilter.addEventListener('change', () => buildUI());
+        refreshBtn.addEventListener('click', initializeDashboard);
+        supportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            supportDropdown.classList.toggle('hidden');
+        });
+        logoutBtn.addEventListener('click', () => {
+            window.location.reload();
+        });
+
+        // General Modal Listeners
+        closeModalBtn.addEventListener('click', () => eventModal.classList.add('hidden'));
+        eventModal.addEventListener('click', (e) => { if (e.target === eventModal) eventModal.classList.add('hidden'); });
+        
+        document.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('info-icon') && tooltip.style.display === 'block') {
+                tooltip.style.display = 'none';
+            }
+            if (!supportBtn.contains(e.target) && !supportDropdown.contains(e.target)) {
+                supportDropdown.classList.add('hidden');
+            }
+        });
+    };
+
+    const populateCompanyFilter = () => {
+        const companySet = new Set(allComplianceData.map(d => d.company).filter(Boolean));
+        companyFilter.innerHTML = ''; // Clear existing options
+        Array.from(companySet).sort().forEach(company => {
+            const option = document.createElement('option');
+            option.value = company;
+            option.textContent = company;
+            companyFilter.appendChild(option);
+        });
+        // Set default value
+        if ([...companyFilter.options].some(opt => opt.value === 'Boltt Games Private Limited')) {
+            companyFilter.value = 'Boltt Games Private Limited';
+        }
+    };
+
+    const populateFyFilter = () => {
+        const fySet = new Set(allComplianceData.map(d => d.fy).filter(Boolean));
+        fyFilter.innerHTML = '<option value="all">All FY</option>';
+        Array.from(fySet).sort((a, b) => b.localeCompare(a)).forEach(fy => {
+            const option = document.createElement('option');
+            option.value = fy; option.textContent = fy;
+            fyFilter.appendChild(option);
+        });
+        if ([...fyFilter.options].some(opt => opt.value === '2025-26')) fyFilter.value = '2025-26';
+    };
+    
+    const getFilteredData = () => {
+        const selectedFy = fyFilter.value;
+        const selectedCompany = companyFilter.value;
+        return allComplianceData.filter(item => {
+            const fyMatch = selectedFy === 'all' || item.fy === selectedFy;
+            const companyMatch = !selectedCompany || item.company === selectedCompany;
+            return fyMatch && companyMatch;
+        });
+    };
+
+    const buildUI = () => {
+        const displayData = getFilteredData();
+        buildCategoryBoxes(displayData);
+        buildWorklist(displayData);
+        chartsContainer.innerHTML = '';
+        if (smallCalendarInstance) updateCalendar(smallCalendarInstance);
+        taskDetailsSection.classList.remove('expanded');
+    };
+    
+    const handlePrintWorklist = () => {
+        const printableArea = document.getElementById('worklist-section-printable');
+        const pendingTasks = getFilteredData().filter(item => item.status !== 'Filed').sort((a, b) => (safeParseDate(a.duedate) || 0) - (safeParseDate(b.duedate) || 0));
+
+        if (pendingTasks.length === 0) {
+            alert("No pending tasks to print.");
+            return;
+        }
+
+        const companyName = companyFilter.value;
+        const fy = fyFilter.value === 'all' ? 'All Financial Years' : fyFilter.value;
+
+        const printHeader = `
+            <div style="margin-bottom: 20px; text-align: center;">
+                <h2 style="font-size: 16pt; font-weight: bold;">Pending Worklist</h2>
+                <p style="font-size: 12pt;">${companyName} - ${fy}</p>
+            </div>
+        `;
+
+        const tableRows = pendingTasks.map(task => `
+            <tr style="border-bottom: 1px solid #ddd; page-break-inside: avoid;">
+                <td style="padding: 8px;">${task.name || 'N/A'}</td>
+                <td style="padding: 8px;">${formatPeriod(task.period)}</td>
+                <td style="padding: 8px;">${safeFormatDate(safeParseDate(task.duedate))}</td>
+                <td style="padding: 8px;">${task.note || ''}</td>
+            </tr>
+        `).join('');
+
+        const tableHTML = `
+            ${printHeader}
+            <table style="width: 100%; border-collapse: collapse; font-size: 10pt;">
+                <thead>
+                    <tr style="background-color: #f2f2f2; text-align: left;">
+                        <th style="padding: 8px;">Task Name</th>
+                        <th style="padding: 8px;">Period</th>
+                        <th style="padding: 8px;">Due Date</th>
+                        <th style="padding: 8px;">Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        `;
+        
+        printableArea.innerHTML = tableHTML;
+        printableArea.classList.remove('hidden');
+
+        // Setup afterprint event
+        const afterPrint = () => {
+            printableArea.classList.add('hidden');
+            window.removeEventListener('afterprint', afterPrint);
+        };
+        window.addEventListener('afterprint', afterPrint);
+
+        window.print();
+    }
+    
+    const buildWorklist = (data) => {
+        const pendingTasks = data.filter(item => item.status !== 'Filed').sort((a, b) => (safeParseDate(a.duedate) || 0) - (safeParseDate(b.duedate) || 0));
+        const headerHTML = `<div class="flex justify-between items-center"><h3 class="text-lg font-bold px-2 text-slate-800">Pending Worklist (${pendingTasks.length})</h3><button id="print-worklist-btn" class="p-2 rounded-md hover:bg-slate-200 transition" title="Print Worklist"><svg class="w-5 h-5 text-slate-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2.75C5 1.784 5.784 1 6.75 1h6.5c.966 0 1.75.784 1.75 1.75v3.5h-12v-3.5C3.25 1.784 4.034 1 5 1zM2.5 8v5.25c0 .966.784 1.75 1.75 1.75h12c.966 0 1.75-.784 1.75-1.75V8h-16zM1.25 7.5a.75.75 0 000 1.5h17.5a.75.75 0 000-1.5H1.25z" clip-rule="evenodd" /></svg></button></div>`;
+        const listHTML = `<div class="overflow-y-auto max-h-80 pr-2 mt-4">${pendingTasks.length > 0 ? `<ul class="space-y-3">${pendingTasks.map(task => `<li class="p-3 bg-slate-50 rounded-lg border border-slate-200"><p class="font-semibold text-slate-800">${task.name||'N/A'}</p><div class="flex justify-between items-center text-xs text-slate-500 mt-1"><span>Period: ${formatPeriod(task.period)}</span><span>Due: ${safeFormatDate(safeParseDate(task.duedate))}</span></div>${task.note?`<p class="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-200">${task.note}</p>`:''}</li>`).join('')}</ul>`:`<p class="text-center text-sm text-slate-500 py-4">No pending tasks.</p>`}</div>`;
+        worklistSection.innerHTML = headerHTML + listHTML;
+        document.getElementById('print-worklist-btn').addEventListener('click', handlePrintWorklist);
+    };
+
+    const buildCategoryBoxes = (data) => {
+        if (!data || !Array.isArray(data)) {
+            console.error("buildCategoryBoxes received invalid data:", data);
+            return;
+        }
+        const categories = data.reduce((acc, item) => {
+            if (item && item.category) {
+                if (!acc[item.category]) acc[item.category] = { total: 0, filed: 0, descriptions: new Set() };
+                acc[item.category].total++;
+                if (item.status === 'Filed') acc[item.category].filed++;
+                if (item.description) acc[item.category].descriptions.add(item.description);
+            }
+            return acc;
+        }, {});
+        categoryBoxesContainer.innerHTML = '';
+        const totalTasks = data.length;
+        const totalFiled = data.filter(d => d.status === 'Filed').length;
+        const allTasksBox = `<div class="gradient-box p-6 rounded-2xl text-white bg-gradient-to-br from-slate-600 to-slate-800 shadow-lg cursor-pointer category-box-animate" data-category="all"><div class="flex justify-between items-start"><h3 class="text-xl font-bold">All Tasks</h3><span class="text-3xl font-extrabold">${totalTasks}</span></div><div class="mt-4 flex justify-between items-center text-sm font-medium"><span>Filed: <span class="font-bold">${totalFiled}</span></span><span>Pending: <span class="font-bold">${totalTasks-totalFiled}</span></span></div><div class="w-full bg-white/20 rounded-full h-2.5 mt-3"><div class="bg-white h-2.5 rounded-full" style="width: ${totalTasks>0?(totalFiled/totalTasks)*100:0}%"></div></div></div>`;
+        categoryBoxesContainer.innerHTML += allTasksBox;
+        const colors = ['from-blue-500 to-indigo-600', 'from-green-500 to-emerald-600', 'from-purple-500 to-violet-600', 'from-orange-500 to-amber-600', 'from-red-500 to-rose-600', 'from-cyan-500 to-sky-600'];
+        Object.keys(categories).sort().forEach((cat, index) => {
+            const descText = Array.from(categories[cat].descriptions).join(' • ') || 'No description.';
+            const boxHTML = `<div class="gradient-box p-6 rounded-2xl text-white bg-gradient-to-br ${colors[index%colors.length]} shadow-lg cursor-pointer category-box-animate" style="animation-delay: ${ (index+1)*50}ms" data-category="${cat}"><div class="flex justify-between items-start"><h3 class="text-xl font-bold">${cat}</h3><div class="flex items-center gap-2"><svg class="info-icon h-5 w-5 text-white/70 hover:text-white" data-info="${descText}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg><span class="text-3xl font-extrabold">${categories[cat].total}</span></div></div><div class="mt-4 flex justify-between items-center text-sm font-medium"><span>Filed: <span class="font-bold">${categories[cat].filed}</span></span><span>Pending: <span class="font-bold">${categories[cat].total-categories[cat].filed}</span></span></div><div class="w-full bg-white/20 rounded-full h-2.5 mt-3"><div class="bg-white h-2.5 rounded-full" style="width: ${categories[cat].total>0?(categories[cat].filed/categories[cat].total)*100:0}%"></div></div></div>`;
+            categoryBoxesContainer.innerHTML += boxHTML;
+        });
+        categoryBoxesContainer.querySelectorAll('[data-category]').forEach(el => el.addEventListener('click', (e) => showTaskView(e.currentTarget, getFilteredData())));
+        categoryBoxesContainer.querySelectorAll('.info-icon').forEach(icon => icon.addEventListener('click', showTooltip));
+    };
+    
+    const showTaskView = (clickedElement, data) => {
+        const category = clickedElement.dataset.category;
+        document.querySelectorAll('[data-category]').forEach(el => el.classList.remove('active'));
+        clickedElement.classList.add('active');
+        currentTaskDataForPagination = (category === 'all') ? data : data.filter(item => item.category === category);
+        
+        const periods = [...new Set(currentTaskDataForPagination.map(item => formatPeriod(item.period)))].sort((a, b) => {
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            if (!isNaN(dateA) && !isNaN(dateB)) return dateB - dateA;
+            return b.localeCompare(a);
+        });
+
+        const periodFilterOptions = periods.map(p => `<option value="${p}">${p}</option>`).join('');
+        const periodFilterHTML = `<select id="period-filter" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm"><option value="all">All Periods</option>${periodFilterOptions}</select>`;
+
+        taskDetailsSection.innerHTML = `<div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4"><h3 class="text-xl font-bold text-slate-700">${category==='all'?'All':category} Compliances</h3><div class="flex items-center gap-2 w-full md:w-auto justify-end">${periodFilterHTML}<div class="flex items-center"><button id="get-ai-summary" class="bg-transparent text-purple-600 hover:bg-purple-100 font-bold p-2.5 rounded-md transition" title="Get AI Summary">✨</button><button id="export-csv-btn" class="ml-2 bg-transparent text-green-600 hover:bg-green-100 font-bold p-2.5 rounded-md transition" title="Export CSV">📄</button><button id="close-task-view" class="ml-2 text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button></div></div></div><div id="ai-summary-container" class="mb-4"></div><div id="paginated-table-container"></div>`;
+        
+        renderTaskPage(1);
+        taskDetailsSection.classList.add('expanded');
+        taskDetailsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        document.getElementById('close-task-view').onclick = () => { taskDetailsSection.classList.remove('expanded'); clickedElement.classList.remove('active'); };
+        document.getElementById('export-csv-btn').onclick = () => exportToCSV(currentTaskDataForPagination, `${category}_compliances`);
+        document.getElementById('get-ai-summary').onclick = () => generateAiSummary(currentTaskDataForPagination);
+        document.getElementById('period-filter').addEventListener('change', () => renderTaskPage(1));
+    };
+
+    function parseRemarksForLinks(text) {
+        if (!text) return '';
+        // Process markdown-style links first: [display text](url)
+        const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
+        let processedText = text.replace(markdownLinkRegex, (match, linkText, url) => {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:underline flex items-center gap-1.5 my-2">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                        ${linkText.trim()}
+                    </a>`;
+        });
+
+        // Process raw URLs that are not already in an href or markdown link
+        const rawUrlRegex = /(?<!href="|href='|\]\()https?:\/\/[^\s]+/g;
+        processedText = processedText.replace(rawUrlRegex, (url) => {
+            let filename = 'Download Link';
+            try {
+                const urlObj = new URL(url);
+                const pathParts = urlObj.pathname.split('/');
+                const decodedPart = decodeURIComponent(pathParts.pop() || '').trim();
+                if(decodedPart) filename = decodedPart;
+            } catch (e) { /* Invalid URL, ignore filename extraction */ }
+            
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:underline flex items-center gap-1.5 my-2">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                        ${filename}
+                    </a>`;
+        });
+
+        return processedText;
+    }
+
+    function renderTaskPage(page) {
+        const periodFilter = document.getElementById('period-filter');
+        const selectedPeriod = periodFilter ? periodFilter.value : 'all';
+
+        const filteredData = selectedPeriod === 'all'
+            ? currentTaskDataForPagination
+            : currentTaskDataForPagination.filter(item => formatPeriod(item.period) === selectedPeriod);
+
+        const data = filteredData;
+        const rowsPerPage = 10;
+        const pageCount = Math.ceil(data.length / rowsPerPage) || 1;
+        const container = document.getElementById('paginated-table-container');
+        if (!container) return;
+        if (page < 1) page = 1; if (page > pageCount) page = pageCount;
+        const start = (page - 1) * rowsPerPage;
+        const paginatedItems = data.slice(start, start + rowsPerPage);
+        
+        let tableHTML = `<div class="overflow-x-auto"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-100 border-b-2 border-slate-200"><tr>${['Name','Period','Due Date','Status','Remarks','Attachment'].map(h=>`<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3">${h}</th>`).join('')}</tr></thead><tbody>${paginatedItems.length>0?paginatedItems.map(item=>`<tr class="bg-white border-b hover:bg-slate-50"><td class="px-3 py-2 sm:px-6 sm:py-4 font-medium text-slate-900 whitespace-nowrap">${item.name||''}</td><td class="px-3 py-2 sm:px-6 sm:py-4">${formatPeriod(item.period)}</td><td class="px-3 py-2 sm:px-6 sm:py-4">${safeFormatDate(safeParseDate(item.duedate))}</td><td class="px-3 py-2 sm:px-6 sm:py-4"><span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${item.status==='Filed'?'bg-green-100 text-green-800':'bg-yellow-100 text-yellow-800'}"><span class="h-1.5 w-1.5 rounded-full ${item.status==='Filed'?'bg-green-600':'bg-yellow-600'}"></span>${item.status}</span></td><td class="px-3 py-2 sm:px-6 sm:py-4">${item.remarks ? `<button class="view-remark-btn text-slate-600 hover:text-slate-900 flex items-center gap-1.5" data-remark="${item.remarks.replace(/"/g, '&quot;')}"><svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>View</button>` : '<span>-</span>'}</td><td class="px-3 py-2 sm:px-6 sm:py-4">${item.filelink?`<a href="${item.filelink}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:underline">Download</a>`:'<span>-</span>'}</td></tr>`).join(''):`<tr><td colspan="6" class="text-center p-8 text-slate-500">No tasks found.</td></tr>`}</tbody></table></div>`;
+        let paginationHTML = '';
+        if (pageCount > 1) paginationHTML = `<div class="mt-4 flex justify-between items-center text-sm text-slate-600"><div>Showing ${data.length>0?start+1:0} to ${Math.min(start+rowsPerPage,data.length)} of ${data.length} entries</div><div class="flex items-center gap-2"><button class="pagination-btn p-2 rounded-md bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed" data-page="${page-1}" ${page===1?'disabled':''}> <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" /></svg></button><span class="font-medium">Page ${page} of ${pageCount}</span><button class="pagination-btn p-2 rounded-md bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed" data-page="${page+1}" ${page===pageCount?'disabled':''}> <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg></button></div></div>`;
+        
+        container.innerHTML = tableHTML + paginationHTML;
+        container.querySelectorAll('.pagination-btn').forEach(button => button.addEventListener('click', (e) => renderTaskPage(parseInt(e.currentTarget.dataset.page))));
+        
+        container.querySelectorAll('.view-remark-btn').forEach(button => {
+            button.addEventListener('click', e => {
+                const remarkText = e.currentTarget.dataset.remark;
+                modalTitle.innerHTML = `<svg class="w-5 h-5 text-slate-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><span>Full Remarks</span>`;
+                modalBody.innerHTML = `<div class="text-slate-700 whitespace-pre-wrap leading-relaxed">${parseRemarksForLinks(remarkText)}</div>`;
+                eventModal.classList.remove('hidden');
+            });
+        });
+    }
+
+    const exportToCSV = (dataToExport, filename) => {
+        if (!dataToExport || dataToExport.length === 0) { alert('No data to export.'); return; }
+        const headers = ['Name', 'Category', 'FY', 'Description', 'Period', 'DueDate', 'Status'];
+        const keys = ['name', 'category', 'fy', 'description', 'period', 'duedate', 'status'];
+        const csvRows = [headers.join(',')];
+        for (const row of dataToExport) {
+            const values = keys.map(key => {
+                let cellValue = row[key] == null ? '' : String(row[key]);
+                if (key === 'duedate' || key === 'period') {
+                    const parsedDate = safeParseDate(cellValue);
+                    if(parsedDate) {
+                        parsedDate.setUTCDate(parsedDate.getUTCDate() - 1);
+                        cellValue = parsedDate.toISOString().split('T')[0];
+                    } else {
+                        cellValue = '';
+                    }
+                }
+                let escaped = cellValue.replace(/"/g, '""');
+                if (escaped.includes(',')) escaped = `"${escaped}"`;
+                return escaped;
+            });
+            csvRows.push(values.join(','));
+        }
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+    };
+    
+    const initializeSmallCalendar = () => {
+        smallCalendarInstance = new FullCalendar.Calendar(document.getElementById('small-calendar'), {
+            initialView: 'dayGridMonth',
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            height: 'auto',
+            dateClick: (info) => {
+                const clickedDate = info.date; 
+                const eventsOnDate = getFilteredData().filter(e => {
+                    const eventDate = safeParseDate(e.duedate); 
+                    if (!eventDate) return false;
+                    return eventDate.getUTCFullYear() === clickedDate.getFullYear() &&
+                           eventDate.getUTCMonth() === clickedDate.getMonth() &&
+                           eventDate.getUTCDate() === clickedDate.getDate();
+                });
+                if (eventsOnDate.length > 0) {
+                    modalTitle.innerHTML = `<svg class="w-6 h-6 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c0-.414.336-.75.75-.75h10.5a.75.75 0 010 1.5H5.5a.75.75 0 01-.75-.75z" clip-rule="evenodd" /></svg><span>Tasks for ${info.date.toLocaleDateString('en-GB')}</span>`;
+                    modalBody.innerHTML = eventsOnDate.map((task, index) => `
+                        <div class="bg-white rounded-lg p-4 shadow-sm border ${getCategoryColor(task.category)} border-l-4">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-bold text-slate-800">${task.name}</h4>
+                                <span class="px-2 py-1 text-xs rounded-full ${task.status === 'Filed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${task.status}</span>
+                            </div>
+                            <p class="text-sm text-slate-500 mt-1">${task.description || 'No description available.'}</p>
+                            <div class="mt-4 pt-2 border-t border-slate-200 flex justify-between text-xs text-slate-600">
+                                <div><strong>Period:</strong> ${formatPeriod(task.period)}</div>
+                                <div><strong>FY:</strong> ${task.fy || 'N/A'}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                    eventModal.classList.remove('hidden');
+                }
+            },
+            dayCellContent: (arg) => {
+                const calDate = arg.date; 
+                const eventsOnDate = getFilteredData().filter(e => {
+                    const eventDate = safeParseDate(e.duedate);
+                    if (!eventDate) return false;
+                    return eventDate.getUTCFullYear() === calDate.getFullYear() &&
+                           eventDate.getUTCMonth() === calDate.getMonth() &&
+                           eventDate.getUTCDate() === calDate.getDate();
+                });
+                if(eventsOnDate.length > 0){
+                    const categories = [...new Set(eventsOnDate.map(e => e.category))];
+                    const color = categories.length > 1 ? getCategoryColor('default', 'bg') : getCategoryColor(categories[0], 'bg');
+                    return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div><div class="${color.replace('border', 'bg')} w-2 h-2 rounded-full mx-auto mt-1"></div>` };
+                }
+                return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div>` };
+            }
+        });
+        smallCalendarInstance.render();
+    };
+
+    const updateCalendar = (cal) => { if (cal) cal.render(); };
+    
+    const showTooltip = (e) => {
+        e.stopPropagation();
+        const icon = e.currentTarget;
+        const info = icon.dataset.info;
+        const rect = icon.getBoundingClientRect();
+        tooltipText.textContent = info;
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${rect.left + rect.width / 2}px`;
+        tooltip.style.top = `${rect.top - 10}px`;
+        tooltip.style.transform = 'translate(-50%, -100%)';
+    };
+
+    // --- GEMINI API FUNCTIONS ---
+
+    async function generateAiSummary(taskData) {
+        const container = document.getElementById('ai-summary-container');
+        if (!container) return;
+        if (!aiModel) {
+            container.innerHTML = `<div class="p-3 bg-red-100 text-red-700 text-sm rounded-lg"><strong>AI Error:</strong> API Key not provided. Please add your key to the script to enable this feature.</div>`;
+            return;
+        }
+        
+        container.innerHTML = `<div class="p-3 bg-blue-50 text-blue-700 text-sm rounded-lg animate-pulse">✨ Generating summary...</div>`;
+        
+        try {
+            const prompt = `You are a compliance assistant for an Indian company. Based on the following JSON data of compliance tasks, provide a concise, bulleted summary for a manager. Highlight the number of pending vs. filed tasks, mention any upcoming critical due dates (within the next 15 days) for pending items, and point out if anything is overdue. Today's date is ${new Date().toDateString()}. The data is: ${JSON.stringify(taskData)}`;
+            const result = await aiModel.generateContent(prompt);
+            let text = result.response.text();
+            
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\* (.*?)(?=\n\*|\n\n|$)/g, '<li>$1</li>').replace(/(\r\n|\n|\r)/gm, "<br>").replace(/<li>/g, '<li class="ml-4 list-disc">');
+
+            container.innerHTML = `<div class="p-4 bg-purple-50 text-purple-900 text-sm rounded-lg border border-purple-200">${text}</div>`;
+        } catch (error) {
+            console.error("Detailed AI Summary Error:", error);
+            let friendlyMessage = `Could not generate summary. An error occurred.`;
+            if (error.message.includes('API key not valid')) {
+                friendlyMessage = `<strong>API Key Invalid.</strong> Please check that your Gemini API key is correct and has the "Generative Language API" enabled in your Google Cloud project.`;
+            } else if (error.message.includes('quota')) {
+                friendlyMessage = `<strong>Quota Exceeded.</strong> You have made too many requests in a short period. Please wait a minute and try again.`;
+            } else if (error.message.includes('404')) {
+                friendlyMessage = `<strong>Model Not Found.</strong> The AI model specified in the code might be incorrect. The code has been updated to use a recommended model.`;
+            }
+            container.innerHTML = `<div class="p-3 bg-red-100 text-red-700 text-sm rounded-lg">${friendlyMessage}</div>`;
+        }
+    }
+
+    async function generateNextSteps(taskName, taskCategory, resultContainer) {
+        if (!resultContainer) return;
+        if (!aiModel) {
+            resultContainer.innerHTML = `<p class="text-red-600 text-xs">AI Key not provided.</p>`;
+            return;
+        }
+
+        resultContainer.innerHTML = `<p class="text-blue-600 text-xs animate-pulse">✨ Suggesting steps...</p>`;
+
+        try {
+            const prompt = `For the Indian compliance task named "${taskName}" under the "${taskCategory}" category, provide a simple, numbered list of the next steps required to complete the filing. Be concise and practical.`;
+            const result = await aiModel.generateContent(prompt);
+            let text = result.response.text();
+            text = text.replace(/^\s*\d+\.\s*(.*)/gm, '<li class="ml-4">$1</li>');
+            resultContainer.innerHTML = `<ol class="list-decimal text-slate-700">${text}</ol>`;
+        } catch (error) {
+            console.error("Detailed AI Next Steps Error:", error);
+            resultContainer.innerHTML = `<p class="text-red-600 text-xs">Could not suggest steps.</p>`;
+        }
+    }
+    
+    initializeDashboard();
+}
+</script>
+</body>
+</html>
+
