@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Payroll Dashboard</title>
+    <title>Payroll Dashboard Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -68,7 +68,20 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
 
-    <div class="container mx-auto p-4 md:p-8">
+    <div id="login-overlay" class="fixed inset-0 bg-gray-100 bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+            <img src="https://www.itvoice.in/wp-content/uploads/2022/12/Background.webp" alt="Company Logo" class="h-12 mx-auto mb-4">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Payroll Dashboard</h2>
+            <p class="text-gray-600 mb-6">Please enter the password to continue.</p>
+            <form id="login-form">
+                <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-md mb-4 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password">
+                <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors">Login</button>
+                <p id="login-error" class="text-red-500 text-sm mt-2 h-4"></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="main-content" class="container mx-auto p-4 md:p-8 hidden">
         
         <main>
             <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
@@ -80,8 +93,7 @@
                         <div>
                             <label for="sheetSelect" class="block text-sm font-medium text-gray-700">Select Payroll Period</label>
                             <select id="sheetSelect" onchange="displayDataForSelectedMonth()" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                <!-- Options are populated dynamically -->
-                            </select>
+                                </select>
                         </div>
                     </div>
                 </section>
@@ -149,8 +161,8 @@
                         </div>
                         <div id="payslipContainer" class="p-4"></div>
                          <div id="payslip-ai-controls" class="hidden mt-4 p-4 border-t">
-                           <button onclick="generateRemarks()" class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-purple-700 transition-colors w-full md:w-auto">✨ Generate Payslip Remarks</button>
-                           <textarea id="ai-remarks" class="mt-2 w-full p-2 border rounded-md bg-gray-50" rows="3" placeholder="AI-generated remarks will appear here..."></textarea>
+                            <button onclick="generateRemarks()" class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-purple-700 transition-colors w-full md:w-auto">✨ Generate Payslip Remarks</button>
+                            <textarea id="ai-remarks" class="mt-2 w-full p-2 border rounded-md bg-gray-50" rows="3" placeholder="AI-generated remarks will appear here..."></textarea>
                          </div>
                     </div>
                 </div>
@@ -201,7 +213,6 @@
         </main>
     </div>
     
-    <!-- Gemini Modal -->
     <div id="geminiModal" class="gemini-modal hidden fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6">
             <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -237,7 +248,22 @@
         const loader = document.getElementById('loader');
         
         window.onload = function() {
-            initializeApp();
+            document.getElementById('login-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                const passwordInput = document.getElementById('password');
+                const loginError = document.getElementById('login-error');
+                
+                if (passwordInput.value === "Boltt@2025") {
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    document.getElementById('main-content').classList.remove('hidden');
+                    document.title = 'Interactive Payroll Dashboard';
+                    initializeApp();
+                } else {
+                    loginError.textContent = 'Incorrect password. Please try again.';
+                    passwordInput.classList.add('border-red-500');
+                    passwordInput.value = '';
+                }
+            });
         };
 
         async function initializeApp() {
@@ -890,8 +916,8 @@
         const geminiModalContent = document.getElementById('geminiModalContent');
 
         async function callGeminiAPI(prompt) {
-            const apiKey = ""; // Keep this empty
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const apiKey = "AIzaSyCDCdCKuD-FFz5vX8NWrDTBIRtkjg0Yo80"; // Keep this empty
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
             };
