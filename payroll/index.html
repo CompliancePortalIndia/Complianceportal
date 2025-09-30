@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Payroll Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 350px;
+        }
+        .tab-button.active {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .kpi-card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+        }
+        #payslipToPrint {
+            box-shadow: 0 0 0 2px #4a5568;
+        }
+         .pagination-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            background-color: #ffffff;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            background-color: #f3f4f6;
+        }
+        .pagination-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .gemini-modal {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <main>
+            <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
+                <header class="text-center md:text-left">
+                    <h1 class="text-4xl font-bold text-gray-900">Interactive Payroll Dashboard</h1>
+                </header>
+                <section id="controlPanel" class="hidden bg-white p-4 rounded-xl shadow-md">
+                    <div class="flex flex-wrap items-end justify-center gap-4">
+                        <div>
+                            <label for="sheetSelect" class="block text-sm font-medium text-gray-700">Select Payroll Period</label>
+                            <select id="sheetSelect" onchange="displayDataForSelectedMonth()" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <!-- Options are populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <section id="configErrorSection" class="hidden bg-white p-8 rounded-xl shadow-lg max-w-3xl mx-auto mb-8">
+                <div class="p-4 bg-red-100 text-red-700 rounded-lg">
+                    <h2 class="font-bold text-center text-xl mb-2">Error</h2>
+                    <p id="errorMessage" class="text-left"></p>
+                </div>
+            </section>
+            
+            <div id="loader" class="mt-6 text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+                <p id="loader-message" class="mt-4 text-gray-600">Loading Payroll data...</p>
+            </div>
+
+            <section id="dashboardContent" class="hidden mt-8">
+                <div class="border-b border-gray-200 mb-6">
+                    <nav class="-mb-px flex space-x-4 overflow-x-auto">
+                        <button onclick="switchTab(event, 'dashboard')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-indigo-600 hover:border-gray-300 active" id="defaultOpen">Dashboard</button>
+                        <button onclick="switchTab(event, 'payslip')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-indigo-600 hover:border-gray-300">Payslip Generator</button>
+                        <button onclick="switchTab(event, 'statutory')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-indigo-600 hover:border-gray-300">Statutory Reports</button>
+                        <button onclick="switchTab(event, 'explorer')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-indigo-600 hover:border-gray-300">Data Explorer</button>
+                        <button onclick="switchTab(event, 'validation')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-indigo-600 hover:border-gray-300">Validation Report</button>
+                    </nav>
+                </div>
+
+                <div id="dashboard" class="tab-content active">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Payroll Overview</h2>
+                            <p class="mt-1 text-gray-600">This section provides a high-level summary of the processed payroll data for the selected month.</p>
+                        </div>
+                       <button onclick="generateSummary()" class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-purple-700 transition-colors">✨ Generate AI Summary</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="kpi-card"><h3 class="text-gray-500">Total Employees</h3><p id="totalEmployees" class="text-2xl md:text-3xl font-bold break-words"></p></div>
+                        <div class="kpi-card"><h3 class="text-gray-500">Total Gross Salary</h3><p id="totalGross" class="text-xl md:text-2xl font-bold break-words"></p></div>
+                        <div class="kpi-card"><h3 class="text-gray-500">Total Deductions</h3><p id="totalDeductions" class="text-xl md:text-2xl font-bold break-words"></p></div>
+                        <div class="kpi-card"><h3 class="text-gray-500">Total Net Pay</h3><p id="totalNet" class="text-xl md:text-2xl font-bold break-words"></p></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white p-6 rounded-xl shadow-lg"><h3 class="text-xl font-semibold mb-4">Monthly Employee Cost Trend</h3><div class="chart-container"><canvas id="comparisonChart"></canvas></div></div>
+                        <div class="bg-white p-6 rounded-xl shadow-lg"><h3 class="text-xl font-semibold mb-4">Salary Component Breakdown</h3><div class="chart-container"><canvas id="componentChart"></canvas></div></div>
+                    </div>
+                </div>
+
+                <div id="payslip" class="tab-content">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Payslip Generator</h2>
+                        <p class="mt-1 text-gray-600">Select an employee from the dropdown list to generate their detailed monthly payslip for the selected period.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <div class="flex flex-wrap items-center justify-between mb-4 gap-4">
+                            <select id="employeeSelect" class="p-2 border rounded-md shadow-sm"></select>
+                            <div>
+                                <button onclick="printPayslip()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Print</button>
+                                <button onclick="downloadAllPayslips()" id="downloadAllBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Download All as PDF</button>
+                            </div>
+                        </div>
+                        <div id="bulkDownloadLoader" class="hidden my-4 text-center">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                            <p id="bulkDownloadStatus" class="mt-2 text-gray-600">Generating PDFs... Please wait.</p>
+                        </div>
+                        <div id="payslipContainer" class="p-4"></div>
+                         <div id="payslip-ai-controls" class="hidden mt-4 p-4 border-t">
+                           <button onclick="generateRemarks()" class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-purple-700 transition-colors w-full md:w-auto">✨ Generate Payslip Remarks</button>
+                           <textarea id="ai-remarks" class="mt-2 w-full p-2 border rounded-md bg-gray-50" rows="3" placeholder="AI-generated remarks will appear here..."></textarea>
+                         </div>
+                    </div>
+                </div>
+
+                <div id="statutory" class="tab-content">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Statutory Compliance Reports</h2>
+                        <p class="mt-1 text-gray-600">Aggregated summaries for statutory filings for the selected period.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <div id="statutoryReportsContainer"></div>
+                        <div id="statutoryPagination" class="mt-4 flex justify-between items-center"></div>
+                    </div>
+                </div>
+
+                <div id="explorer" class="tab-content">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Data Explorer</h2>
+                        <p class="mt-1 text-gray-600">Interactive raw data table for the selected period.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                            <input type="text" id="searchInput" onkeyup="renderDataExplorer(this.value)" placeholder="Search table..." class="w-full md:w-auto flex-grow p-2 border rounded-md">
+                            <button onclick="printMonthlySalarySheet(event)" class="bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 w-full md:w-auto">Print Monthly Sheet (PDF)</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="dataExplorerTable" class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50"></thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="explorerPagination" class="mt-4 flex justify-between items-center"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="validation" class="tab-content">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Validation Report</h2>
+                        <p class="mt-1 text-gray-600">Data integrity and discrepancy checks for the selected period.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <div id="validationReportContainer"></div>
+                        <div id="validationPagination" class="mt-4 flex justify-between items-center"></div>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+    
+    <!-- Gemini Modal -->
+    <div id="geminiModal" class="gemini-modal hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 id="geminiModalTitle" class="text-2xl font-semibold text-gray-800">✨ AI Analysis</h3>
+                <button onclick="closeGeminiModal()" class="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <div id="geminiModalContent" class="prose max-w-none">
+                <div class="flex items-center justify-center py-8">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                </div>
+            </div>
+             <div class="mt-6 flex justify-end">
+                <button onclick="closeGeminiModal()" class="bg-gray-200 text-gray-800 font-semibold px-4 py-2 rounded-md hover:bg-gray-300">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- CONFIGURATION ---
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzBZIuu6fMV2Qvk0-kTNE_sAnkWSfbCd-zlZ_RAP6yqPAwKAh-Pssitm6hvWQQT_wR_/exec';
+        // ---------------------
+
+        let allPayrollData = {};
+        let payrollData = [];
+        let validationAlerts = [];
+        let chartInstances = {};
+        let monthlyTotalsData = {};
+
+        const companyLogoBase64 = "https://www.itvoice.in/wp-content/uploads/2022/12/Background.webp";
+
+        const configErrorSection = document.getElementById('configErrorSection');
+        const loader = document.getElementById('loader');
+        
+        window.onload = function() {
+            initializeApp();
+        };
+
+        async function initializeApp() {
+            if (APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT_URL_HERE') || !APPS_SCRIPT_URL) {
+                showError("Please update the <strong>APPS_SCRIPT_URL</strong> variable in the HTML file's script section to connect to your data.");
+                return;
+            }
+            try {
+                const sheetNames = await fetchSheetNames();
+                populateSheetFilter(sheetNames);
+                await fetchMonthlyTotals();
+                document.getElementById('controlPanel').classList.remove('hidden');
+                await displayDataForSelectedMonth();
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        async function fetchSheetNames() {
+            loader.querySelector('p').textContent = "Fetching available months...";
+            const url = `${APPS_SCRIPT_URL}?action=getSheetNames`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.status === 'error') throw new Error(data.message);
+            if (!data.sheetNames || data.sheetNames.length === 0) throw new Error("No sheets were found in the Google Sheet file.");
+            
+            return data.sheetNames
+                .filter(name => /^[A-Za-z]{3}\s\d{4}$/.test(name))
+                .sort((a, b) => new Date(`1 ${b}`) - new Date(`1 ${a}`));
+        }
+        
+        async function fetchMonthlyTotals() {
+            loader.querySelector('p').textContent = "Analyzing monthly trends...";
+            const url = `${APPS_SCRIPT_URL}?action=getMonthlyTotals`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.status === 'error') {
+                console.warn("Could not fetch monthly totals:", data.message);
+                monthlyTotalsData = {};
+            } else {
+                monthlyTotalsData = data.totals;
+            }
+        }
+
+        function populateSheetFilter(sheetNames) {
+            const sheetSelect = document.getElementById('sheetSelect');
+            sheetSelect.innerHTML = '';
+            sheetNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                sheetSelect.appendChild(option);
+            });
+        }
+
+        async function displayDataForSelectedMonth() {
+            loader.classList.remove('hidden');
+            configErrorSection.classList.add('hidden');
+            document.getElementById('dashboardContent').classList.add('hidden');
+
+            const sheetSelect = document.getElementById('sheetSelect');
+            if (sheetSelect.options.length === 0) {
+                showError("No payroll periods available to load.");
+                return;
+            }
+            const sheetName = sheetSelect.value;
+            const url = `${APPS_SCRIPT_URL}?sheetName=${encodeURIComponent(sheetName)}`;
+            loader.querySelector('p').textContent = `Loading Payroll data for ${sheetName}...`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`The Apps Script returned an error (Status: ${response.status}).`);
+                const data = await response.json();
+
+                if (data.status === 'error') throw new Error(data.message);
+                if (!data.values || data.values.length < 2) throw new Error(`No data returned from Apps Script for sheet "${sheetName}".`);
+                
+                const [headerRow, ...rows] = data.values;
+                const headers = headerRow.map(h => h ? h.toString().trim() : '');
+                
+                const snoIndex = headers.indexOf('S.No.');
+
+                payrollData = rows.map(row => {
+                    const employee = {};
+                    let localHeaders = [...headers];
+                    if (snoIndex > -1) {
+                         row.splice(snoIndex, 1);
+                         localHeaders.splice(snoIndex,1);
+                    }
+                    localHeaders.forEach((header, index) => {
+                        if (!header) return;
+                        employee[header] = row[index]; // Dates are pre-formatted as text
+                    });
+                    return employee;
+                }).filter(emp => emp['Name of Employee']);
+
+                if (payrollData.length === 0) throw new Error(`No valid employee rows found in the data from "${sheetName}".`);
+
+                processData();
+                document.getElementById('dashboardContent').classList.remove('hidden');
+                const activeTab = document.querySelector('.tab-button.active') || document.getElementById('defaultOpen');
+                switchTab({ currentTarget: activeTab }, activeTab.getAttribute('onclick').match(/'([^']+)'/)[1]);
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').innerHTML = message;
+            configErrorSection.classList.remove('hidden');
+            loader.classList.add('hidden');
+            document.getElementById('dashboardContent').classList.add('hidden');
+        }
+
+        function processData() {
+            validationAlerts = [];
+            payrollData = payrollData.map(emp => {
+                const pEmp = {};
+                Object.keys(emp).forEach(key => {
+                    const value = emp[key];
+                    pEmp[key] = (typeof value === 'string') ? value.trim() : value;
+                });
+
+                const earnings = {
+                    basic: parseFloat(pEmp['Basic']) || 0,
+                    hra: parseFloat(pEmp['HRA']) || 0,
+                    cca: parseFloat(pEmp['City Compensatory Allowance']) || 0,
+                    bonus: parseFloat(pEmp['Statutory Bonus']) || 0,
+                    arrear: parseFloat(pEmp['Arrear']) || 0,
+                    variable: parseFloat(pEmp['Variable pay']) || 0,
+                    claim: parseFloat(pEmp['Claim/Incentive']) || 0,
+                };
+
+                const deductions = {
+                    employeePF: parseFloat(pEmp['PF-12%']) || 0,
+                    employeeESIC: parseFloat(pEmp['ESIC-0.75%']) || 0,
+                    tds: parseFloat(pEmp['TDS']) || 0,
+                    lopAdvance: Math.abs(parseFloat(pEmp['LOP/Advance'])) || 0,
+                };
+
+                pEmp.calculated_gross = Object.values(earnings).reduce((a, b) => a + b, 0);
+                pEmp.calculated_deductions = Object.values(deductions).reduce((a, b) => a + b, 0);
+                pEmp.calculated_netPay = pEmp.calculated_gross - pEmp.calculated_deductions;
+                
+                const source_gross = parseFloat(pEmp['Gross Salary']);
+                if (Math.abs(pEmp.calculated_gross - source_gross) > 1) {
+                    validationAlerts.push({
+                        code: pEmp['Employee Code'], name: pEmp['Name of Employee'], severity: 'Discrepancy',
+                        issue: `System-calculated Gross (${formatCurrency(pEmp.calculated_gross)}) does not match Sheet Gross (${formatCurrency(source_gross)}).`
+                    });
+                }
+                
+                const source_net = parseFloat(pEmp['Net Payable']);
+                 if (Math.abs(pEmp.calculated_netPay - source_net) > 1) {
+                    validationAlerts.push({
+                        code: pEmp['Employee Code'], name: pEmp['Name of Employee'], severity: 'Discrepancy',
+                        issue: `System-calculated Net Pay (${formatCurrency(pEmp.calculated_netPay)}) does not match Sheet Net Payable (${formatCurrency(source_net)}).`
+                    });
+                }
+
+                if ((pEmp['TDS'] || 0) > 0 && !pEmp['PAN']) {
+                        validationAlerts.push({
+                        code: pEmp['Employee Code'], name: pEmp['Name of Employee'], severity: 'Warning',
+                        issue: `TDS is deducted but PAN is missing.`
+                    });
+                }
+                return { ...pEmp, ...earnings, ...deductions };
+            });
+        }
+
+        function switchTab(event, tabName) {
+            const tabcontent = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < tabcontent.length; i++) { tabcontent[i].classList.remove('active'); }
+            const tablinks = document.getElementsByClassName("tab-button");
+            for (let i = 0; i < tablinks.length; i++) { tablinks[i].classList.remove('active'); }
+            document.getElementById(tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
+
+            Object.values(chartInstances).forEach(chart => { if (chart) chart.destroy(); });
+
+            switch(tabName) {
+                case 'dashboard': renderDashboard(); break;
+                case 'payslip': renderPayslipGenerator(); break;
+                case 'statutory': renderStatutoryReports(); break;
+                case 'explorer': renderDataExplorer(); break;
+                case 'validation': renderValidationReport(); break;
+            }
+        }
+        
+        function formatCurrency(num) {
+            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0);
+        }
+
+        function renderDashboard() {
+            const totalEmployees = payrollData.length;
+            const totalGross = payrollData.reduce((sum, emp) => sum + (parseFloat(emp['Gross Salary']) || 0), 0);
+            const totalDeductions = payrollData.reduce((sum, emp) => sum + emp.calculated_deductions, 0);
+            const totalNet = payrollData.reduce((sum, emp) => sum + (parseFloat(emp['Net Payable']) || 0), 0);
+            
+            document.getElementById('totalEmployees').textContent = totalEmployees;
+            document.getElementById('totalGross').textContent = formatCurrency(totalGross);
+            document.getElementById('totalDeductions').textContent = formatCurrency(totalDeductions);
+            document.getElementById('totalNet').textContent = formatCurrency(totalNet);
+
+            renderComparisonChart();
+            renderComponentChart();
+        }
+
+        function renderComparisonChart() {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            if(chartInstances.comparisonChart) chartInstances.comparisonChart.destroy();
+            const labels = Object.keys(monthlyTotalsData).sort((a,b) => new Date(`1 ${a}`) - new Date(`1 ${b}`));
+            const data = labels.map(month => monthlyTotalsData[month]);
+
+            chartInstances.comparisonChart = new Chart(ctx, {
+                type: 'line', data: { labels: labels,
+                    datasets: [{ label: 'Total Employee Cost', data: data, borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.1)', fill: true, tension: 0.1 }]
+                }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { tooltip: { callbacks: { label: function(context) { return `Cost: ${formatCurrency(context.raw)}`; } } } } }
+            });
+        }
+        
+        function renderComponentChart() {
+             const ctx = document.getElementById('componentChart').getContext('2d');
+            if (chartInstances.componentChart) chartInstances.componentChart.destroy();
+            const totalBasic = payrollData.reduce((sum, emp) => sum + emp.basic, 0);
+            const totalHra = payrollData.reduce((sum, emp) => sum + emp.hra, 0);
+            const totalCCA = payrollData.reduce((sum, emp) => sum + emp.cca, 0);
+            const totalBonus = payrollData.reduce((sum, emp) => sum + emp.bonus, 0);
+            const otherAllowances = payrollData.reduce((sum, emp) => sum + emp.arrear + emp.variable + emp.claim, 0);
+            chartInstances.componentChart = new Chart(ctx, { type: 'doughnut', data: { labels: ['Basic', 'HRA', 'CCA', 'Bonus', 'Other'], datasets: [{ label: 'Salary Components', data: [totalBasic, totalHra, totalCCA, totalBonus, otherAllowances], backgroundColor: ['#4f46e5', '#7c3aed', '#db2777', '#f59e0b', '#10b981'], }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } } });
+        }
+
+        function renderPayslipGenerator() {
+             const select = document.getElementById('employeeSelect');
+            select.innerHTML = '<option value="">Select an employee...</option>';
+            payrollData.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp['Employee Code'];
+                option.textContent = `${emp['Name of Employee']} (${emp['Employee Code']})`;
+                select.appendChild(option);
+            });
+            select.onchange = (e) => generatePayslip(e.target.value);
+            document.getElementById('payslipContainer').innerHTML = '<p class="text-center text-gray-500">Select an employee to view their payslip.</p>';
+            document.getElementById('payslip-ai-controls').classList.add('hidden');
+        }
+
+        function getPayslipHTML(emp) {
+            const payslipPeriod = `Payslip for ${document.getElementById('sheetSelect').value}`;
+            const netPayInWords = numberToWords(emp.calculated_netPay);
+
+            return `
+                <div id="payslipToPrint" class="p-4 rounded-lg bg-white" style="box-shadow: 0 0 0 2px #374151;">
+                    <div class="mb-4 border-b pb-4">
+                        <div class="flex justify-end">
+                            <img src="${companyLogoBase64}" alt="Company Logo" class="h-10">
+                        </div>
+                        <div class="text-center">
+                            <h3 class="text-2xl font-bold text-gray-800">Boltt Games Private Limited</h3>
+                            <p class="text-xs text-gray-500">CIN: U92490DL2019PTC356329</p>
+                        </div>
+                    </div>
+                    <div class="text-center mb-6">
+                        <h4 class="font-semibold text-lg underline">${payslipPeriod}</h4>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                        <div><strong>Employee Name:</strong> ${emp['Name of Employee'] || 'N/A'}</div>
+                        <div><strong>Employee Code:</strong> ${emp['Employee Code'] || 'N/A'}</div>
+                        <div><strong>Designation:</strong> ${emp['Designation'] || 'N/A'}</div>
+                        <div><strong>Date of Joining:</strong> ${emp['D.O.J'] || 'N/A'}</div>
+                        <div><strong>PAN:</strong> ${emp['PAN'] || 'N/A'}</div>
+                        <div><strong>UAN:</strong> ${emp['UAN'] || 'N/A'}</div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-100"><tr class="text-left"><th class="p-2 font-semibold" colspan="2">Earnings</th></tr></thead>
+                                <tbody>
+                                    <tr class="border-b"><td class="p-2">Basic</td><td class="p-2 text-right">${formatCurrency(emp.basic)}</td></tr>
+                                    <tr class="border-b"><td class="p-2">House Rent Allowance</td><td class="p-2 text-right">${formatCurrency(emp.hra)}</td></tr>
+                                    <tr class="border-b"><td class="p-2">City Compensatory Allowance</td><td class="p-2 text-right">${formatCurrency(emp.cca)}</td></tr>
+                                    <tr class="border-b"><td class="p-2">Statutory Bonus</td><td class="p-2 text-right">${formatCurrency(emp.bonus)}</td></tr>
+                                    ${emp.arrear > 0 ? `<tr class="border-b"><td class="p-2">Arrears</td><td class="p-2 text-right">${formatCurrency(emp.arrear)}</td></tr>` : ''}
+                                     ${emp.variable > 0 ? `<tr class="border-b"><td class="p-2">Variable Pay</td><td class="p-2 text-right">${formatCurrency(emp.variable)}</td></tr>` : ''}
+                                      ${emp.claim > 0 ? `<tr class="border-b"><td class="p-2">Claim/Incentive</td><td class="p-2 text-right">${formatCurrency(emp.claim)}</td></tr>` : ''}
+                                </tbody>
+                                <tfoot class="font-bold bg-gray-50">
+                                    <tr><td class="p-2">Total Earnings (A)</td><td class="p-2 text-right">${formatCurrency(emp.calculated_gross)}</td></tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div>
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-100"><tr class="text-left"><th class="p-2 font-semibold" colspan="2">Deductions</th></tr></thead>
+                                <tbody>
+                                    <tr class="border-b"><td class="p-2">Provident Fund</td><td class="p-2 text-right">${formatCurrency(emp.employeePF)}</td></tr>
+                                    ${emp.employeeESIC > 0 ? `<tr class="border-b"><td class="p-2">E.S.I.C.</td><td class="p-2 text-right">${formatCurrency(emp.employeeESIC)}</td></tr>` : ''}
+                                    <tr class="border-b"><td class="p-2">Tax Deducted at Source (TDS)</td><td class="p-2 text-right">${formatCurrency(emp.tds)}</td></tr>
+                                    <tr class="border-b"><td class="p-2">LOP / Advance</td><td class="p-2 text-right">${formatCurrency(emp.lopAdvance)}</td></tr>
+                                </tbody>
+                                <tfoot class="font-bold bg-gray-50">
+                                    <tr><td class="p-2">Total Deductions (B)</td><td class="p-2 text-right">${formatCurrency(emp.calculated_deductions)}</td></tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="mt-6 bg-indigo-50 p-4 rounded-lg text-center">
+                        <p class="font-bold text-lg">Net Pay (A - B): ${formatCurrency(emp.calculated_netPay)}</p>
+                        <p class="text-sm text-gray-700 mt-1"><strong>In Words:</strong> ${netPayInWords}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function generatePayslip(employeeCode) {
+            const container = document.getElementById('payslipContainer');
+            if (!employeeCode) { 
+                container.innerHTML = '<p class="text-center text-gray-500">Select an employee to view their payslip.</p>'; 
+                document.getElementById('payslip-ai-controls').classList.add('hidden');
+                return; 
+            }
+            const emp = payrollData.find(e => e['Employee Code'] === employeeCode);
+            if (!emp) { 
+                container.innerHTML = '<p class="text-center text-red-500">Employee not found.</p>'; 
+                document.getElementById('payslip-ai-controls').classList.add('hidden');
+                return;
+            }
+            container.innerHTML = getPayslipHTML(emp);
+            document.getElementById('payslip-ai-controls').classList.remove('hidden');
+            document.getElementById('ai-remarks').value = '';
+        }
+
+        async function downloadAllPayslips() {
+            const { jsPDF } = window.jspdf;
+            const zip = new JSZip();
+            const loader = document.getElementById('bulkDownloadLoader');
+            const status = document.getElementById('bulkDownloadStatus');
+            const button = document.getElementById('downloadAllBtn');
+
+            loader.classList.remove('hidden'); button.disabled = true;
+            const sheetName = document.getElementById('sheetSelect').value.replace(' ', '_');
+            
+            for (let i = 0; i < payrollData.length; i++) {
+                const emp = payrollData[i];
+                status.textContent = `Generating PDF ${i + 1} of ${payrollData.length} for ${emp['Name of Employee']}...`;
+                const payslipHTML = getPayslipHTML(emp);
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'fixed'; tempContainer.style.left = '-9999px'; tempContainer.style.top = '0'; tempContainer.style.width = '210mm'; tempContainer.innerHTML = payslipHTML;
+                document.body.appendChild(tempContainer);
+                
+                try {
+                    const canvas = await html2canvas(tempContainer.querySelector('#payslipToPrint'), { scale: 2, useCORS: true });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    const empName = emp['Name of Employee'].replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                    const fileName = `${empName}_${sheetName}.pdf`;
+                    zip.file(fileName, pdf.output('blob'));
+                } catch (err) {
+                    console.error("Error generating PDF for", emp['Name of Employee'], err);
+                } finally { document.body.removeChild(tempContainer); }
+            }
+
+            status.textContent = 'Creating ZIP file...';
+            zip.generateAsync({ type: 'blob' }).then(function(content) {
+                const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = `Payslips_${sheetName}.zip`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                loader.classList.add('hidden'); button.disabled = false;
+            });
+        }
+
+        function printPayslip() {
+            const payslipContainer = document.getElementById('payslipContainer');
+            const content = document.getElementById('payslipToPrint');
+            if (!content) {
+                const originalText = payslipContainer.innerHTML; payslipContainer.innerHTML = '<p class="text-center text-red-500">Please select an employee first to print their payslip.</p>'; setTimeout(() => { payslipContainer.innerHTML = originalText; }, 3000); return;
+            }
+            const printWindow = window.open('', '', 'height=800,width=1000');
+            printWindow.document.write(`<html><head><title>Payslip</title><script src="https://cdn.tailwindcss.com"><\/script><style>body{-webkit-print-color-adjust:exact!important;color-adjust:exact!important}</style></head><body class="p-4">${content.innerHTML}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+        }
+
+        function numberToWords(num) {
+            const roundNum = Math.round(num);
+            if (isNaN(roundNum) || roundNum === null) return '';
+            if (roundNum === 0) return 'Zero Only';
+            const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+            const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+            const g = ['','Thousand','Lakh','Crore'];
+            let i = 0;
+            let str = '';
+            let s = ('000000000' + roundNum).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+            if (!s) return '';
+            for(i=1;i<s.length;i++) {
+                let n = Number(s[i]);
+                if(isNaN(n) || n === 0) continue;
+                if((i==1 || i==2 || i==3)) {
+                    if(n < 20) { str += a[n] + ' '; } else { str += b[Math.floor(n/10)] + (n%10 > 0 ? ' ' + a[n%10] : '') + ' '; }
+                    str += g[4-i]  + ' ';
+                } else if(i==4){
+                    str += a[n] + ' Hundred ';
+                } else if(i==5){
+                    if(str!=='') str+='And ';
+                    if(n < 20) { str += a[n] + ' '; } else { str += b[Math.floor(n/10)] + (n%10 > 0 ? ' ' + a[n%10] : '') + ' '; }
+                }
+            }
+            return str.replace(/\s+/g, ' ').trim() + ' Only';
+        }
+
+        function getSalarySheetHTML() {
+            const sheetName = document.getElementById('sheetSelect').value;
+            const totalGross = payrollData.reduce((sum, emp) => sum + (parseFloat(emp['Gross Salary']) || 0), 0);
+            const totalDeductions = payrollData.reduce((sum, emp) => sum + emp.calculated_deductions, 0);
+            const totalNet = payrollData.reduce((sum, emp) => sum + (parseFloat(emp['Net Payable']) || 0), 0);
+
+            let rowsHTML = '';
+            payrollData.forEach((emp, index) => {
+                rowsHTML += `
+                    <tr class="border-b">
+                        <td class="p-2 text-center">${index + 1}</td>
+                        <td class="p-2">${emp['Employee Code']}</td>
+                        <td class="p-2">${emp['Name of Employee']}</td>
+                        <td class="p-2">${emp['Designation']}</td>
+                        <td class="p-2 text-right">${formatCurrency(parseFloat(emp['Gross Salary']) || 0)}</td>
+                        <td class="p-2 text-right">${formatCurrency(emp.calculated_deductions)}</td>
+                        <td class="p-2 text-right">${formatCurrency(parseFloat(emp['Net Payable']) || 0)}</td>
+                    </tr>
+                `;
+            });
+
+            return `
+                <div id="salarySheetToPrint" class="p-4 bg-white">
+                    <div class="text-center mb-4">
+                        <h2 class="text-xl font-bold">Boltt Games Private Limited</h2>
+                        <h3 class="text-lg font-semibold">Monthly Salary Sheet - ${sheetName}</h3>
+                    </div>
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-100">
+                            <tr class="text-left">
+                                <th class="p-2 text-center">S.No.</th>
+                                <th class="p-2">Emp Code</th>
+                                <th class="p-2">Employee Name</th>
+                                <th class="p-2">Designation</th>
+                                <th class="p-2 text-right">Gross Salary</th>
+                                <th class="p-2 text-right">Total Deductions</th>
+                                <th class="p-2 text-right">Net Payable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHTML}
+                        </tbody>
+                        <tfoot class="font-bold bg-gray-100">
+                            <tr>
+                                <td colspan="4" class="p-2 text-right">Total:</td>
+                                <td class="p-2 text-right">${formatCurrency(totalGross)}</td>
+                                <td class="p-2 text-right">${formatCurrency(totalDeductions)}</td>
+                                <td class="p-2 text-right">${formatCurrency(totalNet)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+        }
+
+        async function printMonthlySalarySheet(event) {
+            const { jsPDF } = window.jspdf;
+            const button = event.currentTarget;
+            const originalText = button.innerHTML;
+            button.innerHTML = `<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>`;
+            button.disabled = true;
+
+            const sheetName = document.getElementById('sheetSelect').value;
+            const salarySheetHTML = getSalarySheetHTML();
+            
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'fixed';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.top = '0';
+            tempContainer.style.width = '297mm'; // A4 landscape
+            tempContainer.innerHTML = salarySheetHTML;
+            document.body.appendChild(tempContainer);
+
+            try {
+                const canvas = await html2canvas(tempContainer.querySelector('#salarySheetToPrint'), { scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                const pageHeight = pdf.internal.pageSize.getHeight();
+
+                let heightLeft = pdfHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft > 0) {
+                    position = heightLeft - pdfHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+                    heightLeft -= pageHeight;
+                }
+                
+                pdf.save(`Monthly_Salary_Sheet_${sheetName.replace(' ', '_')}.pdf`);
+
+            } catch (err) {
+                console.error("Error generating salary sheet PDF:", err);
+                alert("Could not generate the PDF. Please check the console for errors.");
+            } finally {
+                document.body.removeChild(tempContainer);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // --- Pagination and Report Rendering Functions ---
+        let currentReportRenderer = null;
+
+        function createPagination(containerId, data, renderFunction) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            let currentPage = 1;
+            const rowsPerPage = 10;
+
+            function render() {
+                const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
+                const start = (currentPage - 1) * rowsPerPage;
+                const end = start + rowsPerPage;
+                const paginatedData = data.slice(start, end);
+                
+                renderFunction(paginatedData);
+                
+                if (data.length > rowsPerPage) {
+                    container.innerHTML = `
+                        <button id="${containerId}-prev" class="pagination-btn">Previous</button>
+                        <span>Page ${currentPage} of ${totalPages}</span>
+                        <button id="${containerId}-next" class="pagination-btn">Next</button>
+                    `;
+                    document.getElementById(`${containerId}-prev`).disabled = currentPage === 1;
+                    document.getElementById(`${containerId}-next`).disabled = currentPage === totalPages;
+                    document.getElementById(`${containerId}-prev`).onclick = () => { if(currentPage > 1) { currentPage--; render(); } };
+                    document.getElementById(`${containerId}-next`).onclick = () => { if(currentPage < totalPages) { currentPage++; render(); } };
+                } else {
+                    container.innerHTML = '';
+                }
+            }
+            render();
+        }
+
+        function renderStatutoryReports() {
+            const container = document.getElementById('statutoryReportsContainer');
+            container.innerHTML = `
+                <div class="flex border-b mb-4">
+                    <button onclick="renderEPFReport()" class="py-2 px-4 text-gray-600 focus:outline-none focus:border-b-2 focus:border-indigo-500 focus:text-indigo-500">EPF Report</button>
+                    <button onclick="renderESICReport()" class="py-2 px-4 text-gray-600 focus:outline-none focus:border-b-2 focus:border-indigo-500 focus:text-indigo-500">ESIC Report</button>
+                    <button onclick="renderTDSReport()" class="py-2 px-4 text-gray-600 focus:outline-none focus:border-b-2 focus:border-indigo-500 focus:text-indigo-500">TDS Report</button>
+                </div>
+                <div id="statutoryContent"></div>
+            `;
+            renderEPFReport();
+        }
+
+        function renderEPFReport() {
+            currentReportRenderer = () => createPagination('statutoryPagination', payrollData.filter(e => e['UAN'] && e['UAN'].toString().length === 12 && e['UAN'] !== 'Exempt'), (data) => {
+                const headers = ['UAN', 'Member Name', 'Gross Wages', 'EPF Wages', 'EPS Wages', 'EPF Contr.', 'EPS Contr.', 'Diff.'];
+                const rows = data.map(emp => {
+                    const epfWages = Math.min(emp.basic, 15000); const epsContr = Math.round(epfWages * 0.0833); const employerPF = parseFloat(emp['PF-12%_1']) || emp.employeePF; const diff = employerPF - epsContr;
+                    return [emp['UAN'], emp['Name of Employee'], formatCurrency(parseFloat(emp['Gross Salary']) || 0), formatCurrency(epfWages), formatCurrency(epfWages), formatCurrency(emp.employeePF), formatCurrency(epsContr), formatCurrency(diff)];
+                });
+                document.getElementById('statutoryContent').innerHTML = createTableHTML(headers, rows, 'EPF Electronic Challan cum Return (ECR) Data');
+            });
+            currentReportRenderer();
+        }
+
+        function renderESICReport() {
+            currentReportRenderer = () => createPagination('statutoryPagination', payrollData.filter(e => (parseFloat(e['Gross Salary']) || 0) <= 21000 && (parseFloat(e['ESIC-0.75%']) > 0 || parseFloat(e['ESIC-3.25%']) > 0)), (data) => {
+                 const headers = ['IP Number', 'IP Name', 'Days', 'Monthly Wages', 'Employee Contr.', 'Employer Contr.'];
+                 const rows = data.map(emp => ['N/A (Missing)', emp['Name of Employee'], 31, formatCurrency(parseFloat(emp['Gross Salary']) || 0), formatCurrency(emp.employeeESIC), formatCurrency(parseFloat(emp['ESIC-3.25%']) || 0) ]);
+                 let content = createTableHTML(headers, rows, 'ESIC Monthly Contribution Report');
+                 if(data.length === 0) content += `<p class="text-gray-600 mt-4">No employees were found to be eligible for ESIC contributions in this payroll cycle.</p>`;
+                 document.getElementById('statutoryContent').innerHTML = content;
+            });
+            currentReportRenderer();
+        }
+
+        function renderTDSReport() {
+            currentReportRenderer = () => createPagination('statutoryPagination', payrollData.filter(e => e.tds > 0), (data) => {
+                const headers = ['S.No.', 'Employee Code', 'Employee Name', 'PAN', 'Amount of Tax Deducted'];
+                const rows = data.map((emp, index) => [index + 1, emp['Employee Code'], emp['Name of Employee'], emp['PAN'] || 'N/A', formatCurrency(emp.tds)]);
+                document.getElementById('statutoryContent').innerHTML = createTableHTML(headers, rows, 'TDS Statement for Form 24Q');
+            });
+            currentReportRenderer();
+        }
+
+        function renderDataExplorer(searchTerm = '') {
+            const filteredData = payrollData.filter(row => 
+                Object.values(row).some(val => val && val.toString().toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+
+            createPagination('explorerPagination', filteredData, (data) => {
+                if (payrollData.length === 0) return;
+                const headers = Object.keys(payrollData[0]);
+                const tableHead = document.querySelector('#dataExplorerTable thead');
+                const tableBody = document.querySelector('#dataExplorerTable tbody');
+                tableHead.innerHTML = `<tr>${headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}</tr>`;
+                tableBody.innerHTML = data.map(row => `<tr>${headers.map(h => `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${row[h] === undefined || row[h] === null ? '' : row[h]}</td>`).join('')}</tr>`).join('');
+            });
+        }
+        
+        function renderValidationReport() {
+             createPagination('validationPagination', validationAlerts, (data) => {
+                const container = document.getElementById('validationReportContainer');
+                if (validationAlerts.length === 0) {
+                    container.innerHTML = `<div class="text-center p-8 bg-green-50 text-green-800 rounded-lg"><h3 class="text-xl font-semibold">All Clear!</h3><p>No data discrepancies or validation issues were found during processing.</p></div>`;
+                    document.getElementById('validationPagination').innerHTML = '';
+                    return;
+                }
+                const headers = ['Severity', 'Employee', 'Issue Description', 'Action'];
+                const rows = data.map(alert => {
+                    const severityClass = alert.severity === 'Discrepancy' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800';
+                    const explainButton = `<button onclick="explainAnomaly('${alert.issue}')" class="text-indigo-600 hover:text-indigo-800">Explain ✨</button>`;
+                    return [`<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${severityClass}">${alert.severity}</span>`, `${alert.name} (${alert.code})`, alert.issue, explainButton];
+                });
+                container.innerHTML = createTableHTML(headers, rows, 'Validation Issues');
+            });
+        }
+
+        function createTableHTML(headers, rows, title) {
+            let table = `<h3 class="text-xl font-semibold mb-4">${title}</h3><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50"><tr>${headers.map(h => `<th class="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">`;
+            rows.forEach(row => {
+                table += `<tr>${row.map(cell => `<td class="px-4 py-2 whitespace-nowrap">${cell}</td>`).join('')}</tr>`;
+            });
+            table += `</tbody></table></div>`;
+            return table;
+        }
+        
+        // --- Gemini API Functions ---
+        const geminiModal = document.getElementById('geminiModal');
+        const geminiModalTitle = document.getElementById('geminiModalTitle');
+        const geminiModalContent = document.getElementById('geminiModalContent');
+
+        async function callGeminiAPI(prompt) {
+            const apiKey = ""; // Keep this empty
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+            };
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error("Gemini API Error:", error);
+                    return `Error: ${error.error.message}`;
+                }
+                const result = await response.json();
+                return result.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                return "Error: Could not connect to the AI service. Please check your connection and try again.";
+            }
+        }
+        
+        function openGeminiModal(title, isLoading = true) {
+            geminiModalTitle.textContent = title;
+            geminiModalContent.innerHTML = isLoading ? `<div class="flex items-center justify-center py-8"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div></div>` : '';
+            geminiModal.classList.remove('hidden');
+        }
+
+        function closeGeminiModal() {
+            geminiModal.classList.add('hidden');
+        }
+
+        async function generateSummary() {
+            openGeminiModal('✨ AI Payroll Summary');
+            const sheetName = document.getElementById('sheetSelect').value;
+            const previousMonthName = document.getElementById('sheetSelect').options[document.getElementById('sheetSelect').selectedIndex + 1]?.value;
+            let comparisonText = "There is no data for the previous month to compare against.";
+            if (previousMonthName && monthlyTotalsData[previousMonthName]) {
+                const currentCost = monthlyTotalsData[sheetName];
+                const previousCost = monthlyTotalsData[previousMonthName];
+                const difference = currentCost - previousCost;
+                const percentageChange = ((difference / previousCost) * 100).toFixed(2);
+                comparisonText = `The total employee cost for ${sheetName} is ${formatCurrency(currentCost)}. This is a change of ${formatCurrency(difference)} (${percentageChange}%) compared to ${previousMonthName} (${formatCurrency(previousCost)}).`;
+            }
+
+            const prompt = `
+                You are a helpful HR payroll analyst. I will give you some payroll data for a specific month. Please provide a concise, insightful, and easy-to-read summary in markdown format.
+
+                Here is the data for the month of ${sheetName}:
+                - Total Employees: ${payrollData.length}
+                - Total Gross Salary: ${formatCurrency(payrollData.reduce((s, e) => s + e.calculated_gross, 0))}
+                - Total Deductions: ${formatCurrency(payrollData.reduce((s, e) => s + e.calculated_deductions, 0))}
+                - Total Net Pay: ${formatCurrency(payrollData.reduce((s, e) => s + e.calculated_netPay, 0))}
+                - Monthly Cost Comparison: ${comparisonText}
+
+                Based on this, please generate a summary. Highlight the key figures and the comparison to the previous month.
+            `;
+            const summary = await callGeminiAPI(prompt);
+            geminiModalContent.innerHTML = summary.replace(/\n/g, '<br>');
+        }
+        
+        async function generateRemarks() {
+            const employeeCode = document.getElementById('employeeSelect').value;
+            if (!employeeCode) return;
+            const emp = payrollData.find(e => e['Employee Code'] === employeeCode);
+            const remarksTextarea = document.getElementById('ai-remarks');
+            remarksTextarea.value = "Generating...";
+
+            const prompt = `
+                You are a friendly and encouraging HR manager. Write a short, positive, and personalized remark for an employee's payslip. The remark should be 1-2 sentences long.
+
+                Here is some information about the employee:
+                - Name: ${emp['Name of Employee']}
+                - Net Pay This Month: ${formatCurrency(emp.calculated_netPay)}
+                - Any negative deductions (LOP/Advance): ${emp.lopAdvance > 0 ? 'Yes' : 'No'}
+
+                Generate a positive and encouraging remark. For example, you could say "Thank you for your hard work this month!" or "Your dedication is greatly appreciated!". Do not mention the specific salary amount.
+            `;
+            const remarks = await callGeminiAPI(prompt);
+            remarksTextarea.value = remarks;
+        }
+
+        async function explainAnomaly(issue) {
+            openGeminiModal('✨ AI Anomaly Explanation');
+            const prompt = `
+                You are a helpful payroll expert. I have a validation error from my payroll system. Please explain what this error means in simple terms, why it's important to fix, and what the likely cause is. Keep the explanation concise and easy to understand for someone who is not a payroll expert.
+
+                The error is: "${issue}"
+            `;
+            const explanation = await callGeminiAPI(prompt);
+            geminiModalContent.innerHTML = explanation.replace(/\n/g, '<br>');
+        }
+
+
+    </script>
+</body>
+</html>
