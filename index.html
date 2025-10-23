@@ -10,9 +10,11 @@
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        html { scroll-behavior: smooth; } /* Smooth scroll for anchor link */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f1f5f9; /* slate-100 */
+            overflow-x: hidden; /* Prevent horizontal scroll */
         }
         .box-wrapper {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -28,7 +30,7 @@
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
             border: 2px solid #3b82f6;
         }
-        
+
         #loader-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background-color: rgba(255, 255, 255, 0.9);
@@ -40,7 +42,7 @@
             width: 50px; height: 50px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
+
         #task-details-section {
             max-height: 0;
             overflow: hidden;
@@ -53,7 +55,7 @@
             padding: 1.5rem;
             margin-top: 2rem;
         }
-        
+
         #info-tooltip {
             position: absolute; display: none; background-color: #1e293b; color: white;
             padding: 8px 12px; border-radius: 6px; font-size: 12px; z-index: 10000;
@@ -71,56 +73,107 @@
             border-right: 5px solid transparent;
             border-top: 5px solid #1e2b3b;
         }
-        
+
         /* Calendar Theme */
         #calendar-wrapper {
             background-color: #ffffff;
             border-radius: 1rem;
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-            overflow: hidden;
+            overflow: hidden; /* Keep this to round the gradient header */
         }
         .fc {
             --fc-border-color: transparent;
             --fc-today-bg-color: rgba(239, 68, 68, 0.08);
         }
+         /* --- UPDATED CALENDAR HEADER --- */
          #small-calendar .fc-header-toolbar {
-            background: linear-gradient(90deg, #f97316, #ef4444);
-            color: white;
+            background: linear-gradient(135deg, #3b82f6, #6366f1); /* Blue to Indigo gradient */
+            color: white; /* White text on gradient */
             padding: 1rem;
-        }
+            border-top-left-radius: 1rem; /* Match parent container */
+            border-top-right-radius: 1rem; /* Match parent container */
+         }
         #small-calendar .fc-toolbar-title {
-            color: white;
+            color: white; /* White title */
             font-size: 1.125rem;
+            flex-grow: 1;
+            text-align: center;
+        }
+        #small-calendar .fc-button-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
         #small-calendar .fc-button {
-             background-color: rgba(255,255,255,0.1) !important;
-             border: 1px solid rgba(255,255,255,0.2) !important;
-             color: white !important;
+             background-color: transparent !important; /* Transparent buttons */
+             border: none !important;
+             color: white !important; /* White buttons */
              box-shadow: none !important;
              transition: background-color 0.2s;
              padding: 0.2rem !important;
         }
-        #small-calendar .fc-button .fc-icon {
-            font-size: 1em;
-        }
         #small-calendar .fc-button:hover {
-            background-color: rgba(255,255,255,0.2) !important;
+            background-color: rgba(255, 255, 255, 0.2) !important; /* Light transparent white on hover */
+            border-radius: 9999px; /* Make circular */
         }
+        /* --- END UPDATED CALENDAR HEADER --- */
 
-        .fc .fc-daygrid-day { 
-            cursor: pointer; 
-            transition: background-color 0.2s; 
+        #small-calendar .fc-day-header {
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #475569; /* slate-600 */
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+        .fc .fc-daygrid-day {
+            cursor: pointer;
+            transition: background-color 0.2s;
             aspect-ratio: 1 / 1;
             height: auto !important;
+            border-radius: 9999px; /* Circular day cells */
+            overflow: hidden; /* Hide overflow from content */
+            position: relative; /* Needed for absolute positioning of dot/number */
         }
-        .fc .fc-daygrid-day:hover { background-color: rgba(239, 68, 68, 0.05); }
+        .fc .fc-daygrid-day:hover { background-color: rgba(59, 130, 246, 0.05); } /* Light blue hover */
+
+        /* --- UPDATED CALENDAR DAY/EVENT STYLES --- */
         .fc-daygrid-day-events {
-             display: flex; justify-content: center; align-items: center; min-height: 1.2em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 0; /* Remove min-height */
+            position: absolute;
+            bottom: 20%; /* Position it 20% from the bottom */
+            width: 100%;
+            left: 0;
         }
-        .fc .fc-daygrid-day-top { justify-content: center; }
+        .fc .fc-daygrid-day-top {
+            justify-content: center;
+            width: 100%;
+            position: absolute;
+            top: 25%; /* Position it 25% from the top */
+            left: 0;
+        }
+        .fc-event-dot {
+            background-color: #ef4444; /* Red dot for events */
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            /* Removed all positioning, handled by parent flex */
+        }
+         /* --- END UPDATED DAY/EVENT STYLES --- */
+
         #small-calendar .fc-daygrid-day-number { font-size: 0.9em; }
         #small-calendar .fc-day-header { font-size: 0.7em; }
-        #small-calendar { height: auto; }
+        #small-calendar { height: auto; padding: 1rem; } /* Add padding to the whole calendar */
+        #small-calendar .fc-daygrid-day.fc-day-today {
+            background-color: #fce7f3; /* pink-100 */
+            border-radius: 9999px; /* circular */
+        }
+        #small-calendar .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+            color: #db2777; /* pink-600 */
+        }
 
         @keyframes fade-in-up {
             from { opacity: 0; transform: translateY(20px) scale(0.95); }
@@ -134,28 +187,181 @@
         }
 
         /* Modal Redesign */
+        #event-modal { /* Apply glass effect to modal background */
+             background-color: rgba(30, 41, 59, 0.8); /* bg-slate-800/80 */
+             backdrop-filter: blur(4px);
+        }
         .modal-content {
              animation: fade-in-up 0.4s ease-out forwards;
+             background-color: rgba(248, 250, 252, 0.17); /* UPDATED Alpha value */
+             border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle glass border */
+             box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37); /* Add shadow */
         }
+        /* Keep inner task details opaque */
+         #modal-body .bg-white {
+             background-color: #ffffff; /* Ensure inner content is fully white */
+         }
+
+
+        /* --- UPDATED Compliance Overview (Bird's Eye View) Styles --- */
+        #bird-eye-view-section {
+            background: #ffffff; /* White background */
+            border-radius: 1rem; /* Standard rounded-2xl is 1rem */
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); /* shadow-lg */
+            padding: 1.5rem;
+            color: #334155; /* slate-700 */
+            border: 1px solid #e2e8f0; /* border-slate-200 */
+        }
+        #bird-eye-view-section .bird-eye-table {
+            width: 100%;
+            border-collapse: separate; /* Use separate to apply border-radius to cells */
+            border-spacing: 2px; /* Gutter between cells */
+            table-layout: fixed;
+        }
+        #bird-eye-view-section .bird-eye-table th,
+        #bird-eye-view-section .bird-eye-table td {
+            padding: 0;
+            text-align: center;
+            white-space: nowrap;
+            border: none; /* No individual cell borders */
+        }
+        #bird-eye-view-section .bird-eye-table th {
+            background-color: #f1f5f9; /* bg-slate-100 */
+            font-weight: 600;
+            font-size: 10px;
+            line-height: 1.2;
+            white-space: normal;
+            width: 36px;
+            padding: 0.5rem 0.125rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-radius: 0.375rem; /* Rounded corners for header cells */
+            color: #475569; /* slate-600 */
+        }
+        #bird-eye-view-section .bird-eye-table .task-name-col {
+            text-align: left;
+            font-weight: 500;
+            white-space: normal;
+            width: 140px;
+            position: sticky;
+            left: 0;
+            background-color: #f1f5f9; /* bg-slate-100 */
+            z-index: 10;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            color: #475569; /* slate-600 */
+        }
+        #bird-eye-view-section .bird-eye-table tbody .task-name-col {
+            background-color: #ffffff; /* bg-white */
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            color: #334155; /* slate-700 */
+            border-radius: 0.375rem;
+        }
+        .bird-eye-cell {
+            height: 36px;
+            width: 36px;
+            cursor: pointer;
+            position: relative;
+            margin: auto;
+            border-radius: 0.375rem; /* Rounded corners for data cells */
+            background-color: #f8fafc; /* bg-slate-50 */
+            transition: background-color 0.2s, border 0.2s, background-image 0.2s;
+            border: 1px solid #e2e8f0; /* Default border color - slate-200 */
+        }
+        .bird-eye-cell:hover {
+            background-color: #f1f5f9; /* bg-slate-100 */
+            border-color: #cbd5e1; /* border-slate-300 */
+        }
+        .bird-eye-cell.status-filed {
+             /* Stronger green gradient */
+            background-image: linear-gradient(to bottom right, #a5d6a7, #81c784); /* Green shades */
+            border-color: #4caf50; /* Green border */
+            border-left: 4px solid #4caf50;
+        }
+        .bird-eye-cell.status-pending {
+             /* Stronger red gradient */
+            background-image: linear-gradient(to bottom right, #ef9a9a, #e57373); /* Red shades */
+            border-color: #cb2d2d; /* Red border */
+            border-left: 4px solid #cb2d2d;
+        }
+        .bird-eye-cell.status-na {
+            background-color: #f8fafc; /* bg-slate-50 */
+            border-color: #e2e8f0; /* slate-200 border */
+            background-image: none; /* Ensure no gradient */
+        }
+        /* --- END UPDATED Bird's Eye View Styles --- */
+
+
+        /* --- RE-ADDED Worklist Auto-scroll --- */
+         @keyframes marquee-scroll {
+             0% { transform: translateY(0); }
+             100% { transform: translateY(-50%); } /* Scrolls exactly one list height */
+         }
+        .worklist-container {
+            max-height: 20rem; /* max-h-80 */
+            overflow: hidden; /* Changed back to hidden */
+        }
+         .worklist-scroll {
+             animation: marquee-scroll 30s linear infinite;
+         }
+         .worklist-scroll:hover {
+             animation-play-state: paused;
+         }
+        /* --- END RE-ADDED Worklist Styles --- */
+
+
+        /* Scroll-to-top Button */
+        #scroll-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #fb923c; /* orange-400 */
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease, background-color 0.2s ease;
+            z-index: 1000;
+        }
+        #scroll-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        #scroll-to-top:hover {
+            background-color: #f97316; /* orange-500 */
+        }
+
 
         /* Print styles */
         @media print {
-            body * { visibility: hidden; }
-            #worklist-section-printable, #worklist-section-printable * { visibility: visible; }
-            #worklist-section-printable { 
-                position: absolute; 
-                left: 0; 
-                top: 0; 
-                width: 100%;
-                font-size: 10pt;
-                padding: 1rem;
-            }
-             #worklist-section-printable h3 {
-                 background: none !important;
-                 -webkit-print-color-adjust: exact !important;
-                 color: black !important;
+             body * { visibility: hidden; }
+             #worklist-section-printable, #worklist-section-printable * { visibility: visible; }
+             #worklist-section-printable {
+                 position: absolute;
+                 left: 0;
+                 top: 0;
+                 width: 100%;
+                 font-size: 10pt;
+                 padding: 1rem;
              }
+              #worklist-section-printable h3 {
+                   background: none !important;
+                   -webkit-print-color-adjust: exact !important;
+                   color: black !important;
+               }
         }
+
+        /* Removed Animated Circuit Background Styles */
+
     </style>
 </head>
 <body class="text-slate-800">
@@ -181,89 +387,106 @@
         </div>
     </div>
     <div id="info-tooltip"><div class="info-tooltip-arrow"></div><span id="info-tooltip-text"></span></div>
-    
-    <div id="event-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[10001] hidden p-4">
-        <div class="modal-content bg-slate-50 p-0 rounded-xl shadow-xl w-full max-w-2xl relative">
-            <div id="modal-header" class="flex justify-between items-center p-4 bg-white rounded-t-xl">
+
+    <div id="event-modal" class="fixed inset-0 flex items-center justify-center z-[10001] hidden p-4"> <!-- Removed background/blur here --><div class="modal-content p-0 rounded-xl shadow-xl w-full max-w-2xl relative">
+            <div id="modal-header" class="flex justify-between items-center p-4 bg-white/80 rounded-t-xl">
                 <h3 id="modal-title" class="text-lg font-bold text-slate-800 flex items-center gap-3"></h3>
-                 <button id="close-modal" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition">&times;</button>
+                <button id="close-modal" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition">&times;</button>
             </div>
             <div id="modal-body" class="p-6 space-y-4 text-slate-600 max-h-[60vh] overflow-y-auto">
-                <!-- Content will be injected by JS -->
-            </div>
+                <!-- Content will be injected by JS --></div>
         </div>
     </div>
-    
-    <div class="container mx-auto p-4 md:p-6 lg:p-8 hidden">
-        <header class="flex flex-col items-center mb-6">
-            <img src="https://www.itvoice.in/wp-content/uploads/2022/12/Background.webp" alt="Logo" class="h-8 sm:h-10 object-contain mb-4">
-            <div class="w-full flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="text-center w-full md:w-auto md:text-left">
-                    <h1 class="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-amber-500 via-orange-600 to-red-600 bg-clip-text text-transparent">Compliance Dashboard</h1>
-                    <div class="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-2 text-slate-500 mt-1 text-xs sm:text-sm md:text-base">
-                        <span class="hidden sm:inline">Compliance Overview for:</span>
-                        <select id="company-filter" class="bg-slate-100 border-transparent text-slate-900 font-medium rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto p-1"></select>
-                    </div>
+
+    <div class="w-full hidden"> <!-- Changed from container to w-full --><header class="sticky top-0 z-[1000] bg-slate-50/80 backdrop-blur-sm px-4 md:px-6 lg:px-8 py-3 shadow-md border-b border-slate-200"> <!-- Added border-b and shadow-md --><div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-x-4 gap-y-2">
+
+                <!-- Left Side: Logo, Title --><div class="flex items-center gap-3 flex-shrink-0 mr-auto"> <!-- Added mr-auto --><a href="#" title="Reload Dashboard">
+                    <img src="https://www.itvoice.in/wp-content/uploads/2022/12/Background.webp" alt="Logo" class="h-6 object-contain"> <!-- Reduced logo size further --></a>
+                    <h1 class="text-lg md:text-2xl font-extrabold bg-gradient-to-r from-amber-500 via-orange-600 to-red-600 bg-clip-text text-transparent leading-tight">Compliance Dashboard</h1>
+
                 </div>
-                <div class="flex flex-row items-center justify-center md:justify-end gap-2 w-full md:w-auto">
-                    <select id="fy-filter" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto p-2.5 shadow-sm">
+
+                <!-- Right Side: Filters & Buttons -->
+                <!-- Container for filters and buttons -->
+                <!-- Use flex-wrap on smaller screens -->
+                <div class="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2 w-full sm:w-auto">
+                     <!-- Company Filter (Large Screens) - Hidden below sm -->
+                    <select id="company-filter" class="hidden sm:block bg-white border-slate-300 text-slate-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 w-auto p-2 sm:p-2.5 shadow-sm"></select>
+                    <!-- Company Filter (Small Screens) - Shown below sm -->
+                    <select id="company-filter-sm" class="sm:hidden bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 shadow-sm max-w-[150px]"></select> <!-- Added max-width -->
+
+                    <select id="fy-filter" class="bg-white border-slate-300 text-slate-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto p-2 sm:p-2.5 shadow-sm flex-shrink-0"> <!-- Added flex-shrink-0 -->
                         <option value="all">All FY</option>
                     </select>
-                    <button id="refresh-btn" class="bg-slate-200 text-slate-800 font-bold p-2.5 rounded-lg hover:bg-slate-300 transition flex items-center justify-center" title="Refresh Data">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V4a1 1 0 011-1zm12 8a1 1 0 011 1v2.101a7.002 7.002 0 01-11.601 2.566 1 1 0 111.885.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1z" clip-rule="evenodd" /></svg>
-                   </button>
-                   <div class="relative">
-                        <button id="support-btn" class="bg-slate-200 text-slate-800 font-bold p-2.5 rounded-lg hover:bg-slate-300 transition flex items-center justify-center" title="Contact Support">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5h-1A15.5 15.5 0 012 3.5v-1z" /></svg>
-                        </button>
-                        <div id="support-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 hidden origin-top-right transition-all duration-200 ease-out">
-                            <div class="py-1">
-                                <a href="https://wa.me/919810710398" target="_blank" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                                    <svg class="w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.894 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.433-9.89-9.889-9.89-5.452 0-9.887 4.428-9.888 9.891.001 2.03.601 3.996 1.742 5.718l-1.21 4.363 4.646-1.219z"/></svg>
-                                    WhatsApp
-                                </a>
-                                <a href="tel:9810710398" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                                     <svg class="w-5 h-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5h-1A15.5 15.5 0 012 3.5v-1z" /></svg>
-                                    Call Us
-                                </a>
+                    <!-- Buttons container -->
+                    <div class="flex items-center gap-2 flex-shrink-0"> <!-- Added flex-shrink-0 -->
+                        <button id="refresh-btn" class="bg-white border border-slate-300 text-slate-800 font-bold p-2 sm:p-2.5 rounded-lg hover:bg-slate-100 transition flex items-center justify-center shadow-sm" title="Refresh Data">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V4a1 1 0 011-1zm12 8a1 1 0 011 1v2.101a7.002 7.002 0 01-11.601 2.566 1 1 0 111.885.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1z" clip-rule="evenodd" /></svg>
+                       </button>
+                       <div class="relative">
+                            <button id="support-btn" class="bg-white border border-slate-300 text-slate-800 font-bold p-2 sm:p-2.5 rounded-lg hover:bg-slate-100 transition flex items-center justify-center shadow-sm" title="Contact Support">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5h-1A15.5 15.5 0 012 3.5v-1z" /></svg>
+                            </button>
+                            <div id="support-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 hidden origin-top-right transition-all duration-200 ease-out">
+                                <div class="py-1">
+                                    <a href="https://wa.me/919810710398" target="_blank" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                        <svg class="w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.894 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654z"/></svg>
+                                        WhatsApp
+                                    </a>
+                                    <a href="tel:9810710398" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                        <svg class="w-5 h-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5h-1A15.5 15.5 0 012 3.5v-1z" /></svg>
+                                        Call Us
+                                    </a>
+                                </div>
                             </div>
-                        </div>
+                       </div>
+                        <button id="logout-btn" class="bg-white border border-slate-300 text-slate-800 font-bold py-1.5 px-2 sm:py-2 sm:px-3 rounded-lg hover:bg-slate-100 transition flex items-center justify-center shadow-sm" title="Logout">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M6 10a.75.75 0 01.75-.75h9.546l-1.048-.943a.75.75 0 111.004-1.114l2.5 2.25a.75.75 0 010 1.114l-2.5 2.25a.75.75 0 11-1.004-1.114l1.048-.943H6.75A.75.75 0 016 10z" clip-rule="evenodd" /></svg>
+                        </button>
                     </div>
-                    <button id="logout-btn" class="bg-slate-200 text-slate-800 font-bold py-2 px-3 rounded-lg hover:bg-slate-300 transition flex items-center justify-center" title="Logout">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M6 10a.75.75 0 01.75-.75h9.546l-1.048-.943a.75.75 0 111.004-1.114l2.5 2.25a.75.75 0 010 1.114l-2.5 2.25a.75.75 0 11-1.004-1.114l1.048-.943H6.75A.75.75 0 016 10z" clip-rule="evenodd" /></svg>
-                    </button>
                 </div>
+
             </div>
         </header>
 
-        <main id="main-content">
-            <div id="dashboard-content" class="tab-content">
+        <main id="main-content" class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pt-4 mt-8"> <!-- Increased margin-top --><div id="dashboard-content" class="tab-content">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div class="lg:col-span-2 space-y-8">
                         <section id="category-section">
                             <div id="category-boxes" class="grid grid-cols-2 md:grid-cols-3 gap-6"></div>
                         </section>
-                        <section id="task-details-section" class="bg-white rounded-2xl shadow-lg"></section>
+
+                        <!-- Collapsible Task Details Section --><section id="task-details-section" class="bg-white rounded-2xl shadow-lg"></section>
+
+                        <!-- Bird's Eye View Section --><section id="bird-eye-view-section" class="mt-8">
+                            <!-- Content will be injected by JS --></section>
+
                         <div id="charts-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
                     </div>
                     <div class="lg:col-span-1 space-y-8">
                         <div class="bg-white p-4 rounded-2xl shadow-lg">
                             <div id="worklist-section"></div>
                         </div>
-                        <div id="calendar-wrapper">
-                            <div id="small-calendar"></div>
+                        <div id="calendar-wrapper" class="bg-white rounded-2xl shadow-lg border border-slate-200"> <!-- Added classes here --><div id="small-calendar"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
-    
+
     <div id="worklist-section-printable" class="hidden"></div>
+
+    <!-- Scroll-to-top Button --><button id="scroll-to-top" title="Scroll to top">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+        </svg>
+    </button>
+
 
 <script type="module">
     import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
-    
+
     document.addEventListener('DOMContentLoaded', () => {
         const passwordForm = document.getElementById('password-form');
         passwordForm.addEventListener('submit', (e) => {
@@ -274,7 +497,13 @@
                 passwordOverlay.style.transition = 'opacity 0.5s ease';
                 passwordOverlay.style.opacity = '0';
                 setTimeout(() => passwordOverlay.style.display = 'none', 500);
-                document.querySelector('.container').classList.remove('hidden');
+                // Correctly target the main container to remove the 'hidden' class
+                const mainContainer = document.querySelector('body > div.w-full.hidden');
+                if (mainContainer) {
+                    mainContainer.classList.remove('hidden');
+                } else {
+                    console.error("Main container (.w-full.hidden) not found."); // Add error logging
+                }
                 startApp();
             } else {
                 const passwordError = document.getElementById('password-error');
@@ -314,31 +543,31 @@
             return `<svg xmlns="http://www.w3.org/2000/svg" class="${watermarkClasses}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>`;
         }
     };
-    
+
     const getColorScheme = (name, index) => {
         const normalizedName = name.toLowerCase();
         const schemes = [
-            { text: 'text-slate-800', bg: 'bg-gradient-to-r from-yellow-500 to-orange-600' },
+            { text: 'text-slate-800', bg: 'bg-gradient-to-r from-lime-500 to-green-700' }, // Changed GST/Indirect Tax color
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-fuchsia-600 to-purple-700' },
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-red-600 to-pink-700' },
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-cyan-600 to-blue-800' },
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-blue-700 to-indigo-900' },
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-sky-500 to-blue-700' },
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-red-600 to-red-800' },
-            { text: 'text-slate-800', bg: 'bg-gradient-to-r from-lime-500 to-green-700' },
+            { text: 'text-slate-800', bg: 'bg-gradient-to-r from-yellow-500 to-orange-600' }, // Original GST color moved here
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-amber-500 to-yellow-700' },
             { text: 'text-slate-800', bg: 'bg-gradient-to-r from-emerald-500 to-teal-700' }
         ];
 
         // Specific keyword matching for consistency
-        if (normalizedName.includes('gst') || normalizedName.includes('indirect')) return schemes[0];
+        if (normalizedName.includes('gst') || normalizedName.includes('indirect')) return schemes[0]; // Updated index
         if (normalizedName.includes('income tax') || normalizedName.includes('direct')) return schemes[1];
         if (normalizedName.includes('roc')) return schemes[2];
         if (normalizedName.includes('labour')) return schemes[3];
         if (normalizedName.includes('financials')) return schemes[6];
         if (normalizedName.includes('igcr')) return schemes[8];
         if (normalizedName.includes('document')) return schemes[5];
-        
+
         // Fallback to index-based for variety
         return schemes[index % schemes.length];
     };
@@ -351,25 +580,30 @@ function startApp() {
         document.body.innerHTML = `<div class="p-8 text-center text-red-500">Error: Google Sheet URL is not configured.</div>`;
         return;
     }
-    
+
     const loader = document.getElementById('loader-overlay');
     const loaderText = document.getElementById('loader-text');
     const progressBar = document.getElementById('progress-bar');
     const fyFilter = document.getElementById('fy-filter');
     const companyFilter = document.getElementById('company-filter');
+    const companyFilterSm = document.getElementById('company-filter-sm'); // Small screen filter
     const categoryBoxesContainer = document.getElementById('category-boxes');
     const chartsContainer = document.getElementById('charts-container');
     const tooltip = document.getElementById('info-tooltip');
     const tooltipText = document.getElementById('info-tooltip-text');
     const taskDetailsSection = document.getElementById('task-details-section');
     const worklistSection = document.getElementById('worklist-section');
+    const birdEyeViewContainer = document.getElementById('bird-eye-view-section');
+    const scrollToTopBtn = document.getElementById('scroll-to-top');
+    // Removed Header Search Inputs
+
 
     // General Modal Elements
     const eventModal = document.getElementById('event-modal');
     const closeModalBtn = document.getElementById('close-modal');
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
-    
+
     const refreshBtn = document.getElementById('refresh-btn');
     const supportBtn = document.getElementById('support-btn');
     const supportDropdown = document.getElementById('support-dropdown');
@@ -378,7 +612,7 @@ function startApp() {
 
     let allComplianceData = [], smallCalendarInstance, genAI, aiModel;
     let currentTaskDataForPagination = [];
-    
+
 
     if (API_KEY) {
         try {
@@ -401,28 +635,43 @@ function startApp() {
         if (loaderText && text) loaderText.textContent = text;
     };
 
+    // --- Original safeParseDate Logic ---
     const safeParseDate = (dateString) => {
         if (!dateString || typeof dateString !== 'string') return null;
-        const date = new Date(`${dateString.split('T')[0]}T12:00:00Z`);
+        // Assume dateString is YYYY-MM-DD or includes T
+        const datePart = dateString.split('T')[0];
+        // Parse as UTC noon to avoid timezone shifting the date during parsing
+        const date = new Date(`${datePart}T12:00:00Z`);
         return isNaN(date.getTime()) ? null : date;
     };
+    // --- End Original safeParseDate Logic ---
 
+    // Format date for display (DD/MM/YYYY) using UTC methods
     const safeFormatDate = (date) => date ? date.toLocaleDateString('en-GB', { timeZone: 'UTC' }) : 'N/A';
+
+    // Format period for display (MMM YYYY) using UTC methods
     const formatPeriod = (dateString) => {
         if (!dateString) return "N/A";
+        // Handle explicit "Month YYYY" strings
         if (/^[a-zA-Z]+ \d{4}$/.test(dateString.trim())) return dateString.trim();
-        const date = safeParseDate(dateString);
+        const date = safeParseDate(dateString); // Use the restored parser
+        // Use UTC month and year
         return date ? `${date.toLocaleString('default', { month: 'short', timeZone: 'UTC' })} ${date.getUTCFullYear()}` : 'N/A';
     };
 
+
+    // --- Updated fetchData Logic with error handling ---
     const fetchData = async () => {
         try {
             updateProgress(10, 'Fetching data from source...');
             const response = await fetch(`${GOOGLE_SHEET_URL}?sheet=ComplianceData`);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                // Throw an error with more context if response is not ok
+                 throw new Error(`HTTP error! Status: ${response.status}. Failed to fetch data. Please check the Google Sheet URL and ensure the Apps Script is deployed correctly with 'Anyone' access.`);
+            }
             const data = await response.json();
             updateProgress(50, 'Processing data...');
-            
+
             return data.map((row, index) => {
                 const newRow = { rowIndex: index + 2 };
                 for (const key in row) {
@@ -430,33 +679,48 @@ function startApp() {
                     newRow[normalizedKey] = row[key];
                 }
 
+                // --- Original adjustDate function ---
                 const adjustDate = (dateStr) => {
                     if (!dateStr || typeof dateStr !== 'string') return dateStr;
                     const parts = dateStr.split('T')[0].split('-');
                     if (parts.length === 3) {
                         const originalDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
                         if (!isNaN(originalDate.getTime())) {
+                            // Add one day in UTC
                             originalDate.setUTCDate(originalDate.getUTCDate() + 1);
+                            // Return as YYYY-MM-DD string based on the *adjusted* UTC date
                             return originalDate.toISOString().split('T')[0];
                         }
                     }
-                    return dateStr;
+                    return dateStr; // Return original if format is unexpected
                 };
-                
+                // --- End original adjustDate function ---
+
+                // Apply the adjustment
                 newRow.duedate = adjustDate(newRow.duedate);
-                newRow.period = adjustDate(newRow.period);
+                newRow.period = adjustDate(newRow.period); // Also adjust period if it's a date
 
                 return newRow;
             });
-        } catch (error) { console.error(`Fetch Error:`, error); return null; }
+        } catch (error) {
+            console.error(`Fetch Error:`, error);
+            // Display the error message in the UI
+            if (categoryBoxesContainer) {
+                categoryBoxesContainer.innerHTML = `<div class="col-span-full text-center p-8 bg-red-100 text-red-700 rounded-lg shadow"><strong>Error:</strong> ${error.message || 'Failed to load compliance data. Check network or Google Sheet URL/deployment.'}</div>`;
+            }
+            return null; // Return null to indicate failure
+        }
     };
+     // --- End Updated fetchData Logic ---
+
 
     const initializeDashboard = async () => {
         showLoader();
         allComplianceData = await fetchData();
-        if (!allComplianceData) { 
-            hideLoader(); 
-            categoryBoxesContainer.innerHTML = `<div class="col-span-full text-center p-8 bg-white rounded-lg shadow">Failed to load compliance data.</div>`;
+        // Check if fetchData returned null (error occurred)
+        if (allComplianceData === null) {
+            hideLoader();
+            // Error message is already displayed by fetchData
             return;
         }
         updateProgress(75, 'Building dashboard...');
@@ -468,10 +732,18 @@ function startApp() {
         updateProgress(100, 'Done!');
         setTimeout(hideLoader, 300);
     };
-    
+
     const setupEventListeners = () => {
         fyFilter.addEventListener('change', () => buildUI());
-        companyFilter.addEventListener('change', () => buildUI());
+        companyFilter.addEventListener('change', () => {
+            companyFilterSm.value = companyFilter.value; // Sync small screen filter
+            buildUI();
+        });
+         companyFilterSm.addEventListener('change', () => {
+             companyFilter.value = companyFilterSm.value; // Sync large screen filter
+             buildUI();
+         });
+
         refreshBtn.addEventListener('click', initializeDashboard);
         supportBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -481,10 +753,15 @@ function startApp() {
             window.location.reload();
         });
 
+        // Removed Header Search Listeners
+
         // General Modal Listeners
         closeModalBtn.addEventListener('click', () => eventModal.classList.add('hidden'));
-        eventModal.addEventListener('click', (e) => { if (e.target === eventModal) eventModal.classList.add('hidden'); });
-        
+        eventModal.addEventListener('click', (e) => {
+            // Close only if clicking the backdrop itself, not the content
+            if (e.target === eventModal) eventModal.classList.add('hidden');
+        });
+
         document.addEventListener('click', (e) => {
             if (!e.target.classList.contains('info-icon') && tooltip.style.display === 'block') {
                 tooltip.style.display = 'none';
@@ -493,21 +770,44 @@ function startApp() {
                 supportDropdown.classList.add('hidden');
             }
         });
+
+         // --- Scroll-to-Top Logic ---
+         window.addEventListener('scroll', () => {
+             if (window.scrollY > 200) { // Show button after scrolling 200px
+                 scrollToTopBtn.classList.add('visible');
+             } else {
+                 scrollToTopBtn.classList.remove('visible');
+             }
+         });
+         scrollToTopBtn.addEventListener('click', () => {
+             window.scrollTo({ top: 0, behavior: 'smooth' });
+         });
+         // --- End Scroll-to-Top ---
     };
 
     const populateCompanyFilter = () => {
         const companySet = new Set(allComplianceData.map(d => d.company).filter(Boolean));
-        companyFilter.innerHTML = ''; // Clear existing options
+        // Clear existing options for both filters
+        companyFilter.innerHTML = '';
+        companyFilterSm.innerHTML = '<option value="">Select Company</option>'; // Add placeholder for mobile
+
         Array.from(companySet).sort().forEach(company => {
             const option = document.createElement('option');
             option.value = company;
             option.textContent = company;
-            companyFilter.appendChild(option);
+            companyFilter.appendChild(option.cloneNode(true)); // Add to large screen filter
+            companyFilterSm.appendChild(option); // Add to small screen filter
         });
-        // Set default value
-        if ([...companyFilter.options].some(opt => opt.value === 'Boltt Games Private Limited')) {
-            companyFilter.value = 'Boltt Games Private Limited';
-        }
+
+        // Set default value for both
+         const defaultValue = 'Boltt Games Private Limited';
+         if ([...companyFilter.options].some(opt => opt.value === defaultValue)) {
+             companyFilter.value = defaultValue;
+             // Don't set default on mobile placeholder version
+             if ([...companyFilterSm.options].some(opt => opt.value === defaultValue)) {
+                 companyFilterSm.value = defaultValue;
+             }
+         }
     };
 
     const populateFyFilter = () => {
@@ -520,34 +820,43 @@ function startApp() {
         });
         if ([...fyFilter.options].some(opt => opt.value === '2025-26')) fyFilter.value = '2025-26';
     };
-    
+
     const getFilteredData = () => {
         const selectedFy = fyFilter.value;
-        const selectedCompany = companyFilter.value;
+        const selectedCompany = companyFilter.value; // Use the main filter's value (synced)
         return allComplianceData.filter(item => {
             const isDocManager = item.group === 'Document Manager';
             const fyMatch = selectedFy === 'all' || item.fy === selectedFy || isDocManager;
-            const companyMatch = !selectedCompany || item.company === selectedCompany;
+            const companyMatch = !selectedCompany || selectedCompany === "" || item.company === selectedCompany; // Handle empty mobile selection
             return fyMatch && companyMatch;
         });
     };
 
-    const buildUI = () => {
+    const buildUI = (isMainView = true) => { // Added flag to know if it's the main view
         const displayData = getFilteredData();
-        buildCategoryBoxes(displayData);
+        buildCategoryBoxes(displayData, null, isMainView); // Pass isMainView flag
         buildWorklist(displayData);
+
+        // Only build Bird's Eye View on the main dashboard load/refresh
+        if (isMainView) {
+             buildBirdEyeView(displayData);
+             birdEyeViewContainer.style.display = 'block'; // Ensure visible
+        } else {
+             birdEyeViewContainer.style.display = 'none'; // Hide if not main view
+        }
+
         chartsContainer.innerHTML = '';
         if (smallCalendarInstance) updateCalendar(smallCalendarInstance);
         taskDetailsSection.classList.remove('expanded');
     };
-    
+
     const handlePrintWorklist = () => {
         const printableArea = document.getElementById('worklist-section-printable');
         const worklistData = getFilteredData().filter(item => item.group !== 'Document Manager');
         const pendingTasks = worklistData.filter(item => item.status !== 'Filed').sort((a, b) => (safeParseDate(a.duedate) || 0) - (safeParseDate(b.duedate) || 0));
 
         if (pendingTasks.length === 0) {
-            alert("No pending tasks to print.");
+            alert("No pending tasks to print."); // Changed to alert
             return;
         }
 
@@ -586,7 +895,7 @@ function startApp() {
                 </tbody>
             </table>
         `;
-        
+
         printableArea.innerHTML = tableHTML;
         printableArea.classList.remove('hidden');
 
@@ -599,26 +908,48 @@ function startApp() {
 
         window.print();
     }
-    
+
     const buildWorklist = (data) => {
         const worklistData = data.filter(item => item.group !== 'Document Manager');
         const pendingTasks = worklistData.filter(item => item.status !== 'Filed').sort((a, b) => (safeParseDate(a.duedate) || 0) - (safeParseDate(b.duedate) || 0));
         const headerHTML = `<div class="flex justify-between items-center"><h3 class="text-lg font-bold px-2 text-slate-800">Pending Worklist (${pendingTasks.length})</h3><button id="print-worklist-btn" class="p-2 rounded-md hover:bg-slate-200 transition" title="Print Worklist"><svg class="w-5 h-5 text-slate-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2.75C5 1.784 5.784 1 6.75 1h6.5c.966 0 1.75.784 1.75 1.75v3.5h-12v-3.5C3.25 1.784 4.034 1 5 1zM2.5 8v5.25c0 .966.784 1.75 1.75 1.75h12c.966 0 1.75-.784 1.75-1.75V8h-16zM1.25 7.5a.75.75 0 000 1.5h17.5a.75.75 0 000-1.5H1.25z" clip-rule="evenodd" /></svg></button></div>`;
-        const listHTML = `<div class="overflow-y-auto max-h-80 pr-2 mt-4">${pendingTasks.length > 0 ? `<ul class="space-y-3">${pendingTasks.map(task => `<li class="p-3 bg-slate-50 rounded-lg border border-slate-200"><p class="font-semibold text-slate-800">${task.name||'N/A'}</p><div class="flex justify-between items-center text-xs text-slate-500 mt-1"><span>Period: ${formatPeriod(task.period)}</span><span>Due: ${safeFormatDate(safeParseDate(task.duedate))}</span></div>${task.note?`<p class="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-200">${task.note}</p>`:''}</li>`).join('')}</ul>`:`<p class="text-center text-sm text-slate-500 py-4">No pending tasks.</p>`}</div>`;
+
+         // --- Logic for Auto-Scroll ---
+         const listItemsHTML = pendingTasks.length > 0
+             ? pendingTasks.map(task => `<li class="p-3 bg-slate-50 rounded-lg border border-slate-200"><p class="font-semibold text-slate-800">${task.name||'N/A'}</p><div class="flex justify-between items-center text-xs text-slate-500 mt-1"><span>Period: ${formatPeriod(task.period)}</span><span>Due: ${safeFormatDate(safeParseDate(task.duedate))}</span></div>${task.note?`<p class="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-200">${task.note}</p>`:''}</li>`).join('')
+             : `<li class="text-center text-sm text-slate-500 py-4">No pending tasks.</li>`;
+
+         const canScroll = pendingTasks.length > 6; // Only scroll if list is long
+         // Adjust duration calculation if needed, e.g., make it faster
+         const duration = canScroll ? pendingTasks.length * 2.0 : 0; // Faster: 2.0s per item
+         const scrollClass = canScroll ? 'worklist-scroll' : '';
+         const style = canScroll ? `style="animation-duration: ${duration}s"` : '';
+
+         const listHTML = `<div class="worklist-container mt-4">
+             <ul class="space-y-3 ${scrollClass}" ${style}>
+                 ${listItemsHTML}
+                 ${canScroll ? listItemsHTML : ''} <!-- Duplicate content for seamless loop --></ul>
+         </div>`;
+         // --- End Auto-Scroll Logic ---
+
         worklistSection.innerHTML = headerHTML + listHTML;
         document.getElementById('print-worklist-btn').addEventListener('click', handlePrintWorklist);
     };
 
-    const buildCategoryBoxes = (data, groupFilter = null) => {
+
+    const buildCategoryBoxes = (data, groupFilter = null, isMainView = true) => { // Accept isMainView flag
         if (!data || !Array.isArray(data)) return;
         categoryBoxesContainer.innerHTML = '';
 
         if (groupFilter) {
+             // When a group is selected, ensure Bird's Eye View is hidden
+             if (birdEyeViewContainer) birdEyeViewContainer.style.display = 'none';
+
             const backButtonHTML = `<div class="col-span-full"><button id="back-to-groups-btn" class="mb-2 flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-600 transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>Back to Dashboard</button></div>`;
             categoryBoxesContainer.innerHTML = backButtonHTML;
             document.getElementById('back-to-groups-btn').addEventListener('click', () => {
-                buildCategoryBoxes(getFilteredData());
-                taskDetailsSection.classList.remove('expanded');
+                 // When going back, explicitly call buildUI(true) to show Bird's Eye again
+                 buildUI(true); // Rebuild UI, indicating it IS the main view
             });
 
             const groupData = data.filter(item => item.group === groupFilter);
@@ -636,7 +967,7 @@ function startApp() {
                 const colors = getColorScheme(cat, index);
                 let statsHTML = '';
                  if (groupFilter !== 'Document Manager') {
-                    statsHTML = `<div class="flex justify-between items-center text-xs font-medium text-slate-600"><span>Filed: <span class="font-bold">${stats.filed}</span></span><span>Pending: <span class="font-bold">${stats.total - stats.filed}</span></span></div><div class="w-full bg-black/10 rounded-full h-1.5 mt-2"><div class="${colors.bg} h-1.5 rounded-full" style="width: ${stats.total > 0 ? (stats.filed / stats.total) * 100 : 0}%"></div></div>`;
+                     statsHTML = `<div class="flex justify-between items-center text-xs font-medium text-slate-600"><span>Filed: <span class="font-bold">${stats.filed}</span></span><span>Pending: <span class="font-bold">${stats.total - stats.filed}</span></span></div><div class="w-full bg-black/10 rounded-full h-1.5 mt-2"><div class="${colors.bg} h-1.5 rounded-full" style="width: ${stats.total > 0 ? (stats.filed / stats.total) * 100 : 0}%"></div></div>`;
                  }
 
                 const boxHTML = `<div class="box-wrapper bg-white rounded-xl shadow-md cursor-pointer category-box-animate" data-category="${cat}" data-parent-group="${groupFilter}" style="animation-delay: ${index * 50}ms">
@@ -659,38 +990,45 @@ function startApp() {
             categoryBoxesContainer.querySelectorAll('[data-category]').forEach(el => el.addEventListener('click', (e) => showTaskView(e.currentTarget, data)));
 
         } else {
-            // Default View
+            // Default View (groupFilter is null)
+             if (isMainView && birdEyeViewContainer) { // Only show if it's the main view context
+                 birdEyeViewContainer.style.display = 'block';
+             }
+
             const totalTasks = data.filter(d => d.group !== 'Document Manager').length;
             const totalFiled = data.filter(d => d.status === 'Filed' && d.group !== 'Document Manager').length;
             const allTasksBox = `<div class="box-wrapper rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 shadow-lg text-white category-box-animate" data-category="all">
-                 <div class="p-4 h-full flex flex-col justify-between z-10 relative">
-                     <div>
-                        <div class="flex items-start justify-between gap-2">
-                            <h3 class="text-base font-bold">All Tasks</h3>
-                            <p class="text-2xl font-extrabold">${totalTasks}</p>
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <div class="flex justify-between items-center text-xs font-medium text-slate-300">
-                           <span>Filed: <span class="font-bold">${totalFiled}</span></span>
-                           <span>Pending: <span class="font-bold">${totalTasks - totalFiled}</span></span>
-                        </div>
-                       <div class="w-full bg-white/20 rounded-full h-1.5 mt-2"><div class="bg-white h-1.5 rounded-full" style="width: ${totalTasks > 0 ? (totalFiled / totalTasks) * 100 : 0}%"></div></div>
-                    </div>
-                </div>
-                ${getIconForCategory('All Tasks').replace('text-gray-200', 'text-slate-700')}
-            </div>`;
+                   <div class="p-4 h-full flex flex-col justify-between z-10 relative">
+                       <div>
+                            <div class="flex items-start justify-between gap-2">
+                                <h3 class="text-base font-bold">All Tasks</h3>
+                                <p class="text-2xl font-extrabold">${totalTasks}</p>
+                            </div>
+                       </div>
+                       <div class="mt-4">
+                            <div class="flex justify-between items-center text-xs font-medium text-slate-300">
+                               <span>Filed: <span class="font-bold">${totalFiled}</span></span>
+                               <span>Pending: <span class="font-bold">${totalTasks - totalFiled}</span></span>
+                            </div>
+                           <div class="w-full bg-white/20 rounded-full h-1.5 mt-2"><div class="bg-white h-1.5 rounded-full" style="width: ${totalTasks > 0 ? (totalFiled / totalTasks) * 100 : 0}%"></div></div>
+                       </div>
+                   </div>
+                   ${getIconForCategory('All Tasks').replace('text-gray-200', 'text-slate-700')}
+             </div>`;
             categoryBoxesContainer.innerHTML = allTasksBox;
-            
+
             const groups = data.reduce((acc, item) => {
                 if (item && item.group) {
                     if (!acc[item.group]) acc[item.group] = { total: 0, filed: 0 };
                     acc[item.group].total++;
-                    if (item.status === 'Filed') acc[item.group].filed++;
+                     // Use case-insensitive and trimmed status check
+                    if (item.status && item.status.trim().toLowerCase() === 'filed') {
+                        acc[item.group].filed++;
+                    }
                 }
                 return acc;
             }, {});
-            
+
             let groupNames = Object.keys(groups);
             const docManagerIndex = groupNames.indexOf('Document Manager');
             if (docManagerIndex > -1) {
@@ -698,54 +1036,198 @@ function startApp() {
             }
             groupNames.sort();
             if (docManagerIndex > -1) {
-                groupNames.unshift('Document Manager');
+                groupNames.unshift('Document Manager'); // Ensure Doc Manager is first
             }
-            
+
             groupNames.forEach((group, index) => {
                 const stats = groups[group];
                 const colors = getColorScheme(group, index);
                 let statsHTML = '';
-                 if (group !== 'Document Manager') {
-                     statsHTML = `
-                        <div class="flex justify-between items-center text-xs font-medium text-slate-600">
-                           <span>Filed: <span class="font-bold">${stats.filed}</span></span>
-                           <span>Pending: <span class="font-bold">${stats.total - stats.filed}</span></span>
-                        </div>
-                        <div class="w-full bg-black/10 rounded-full h-1.5 mt-2"><div class="${colors.bg} h-1.5 rounded-full" style="width: ${stats.total > 0 ? (stats.filed / stats.total) * 100 : 0}%"></div></div>
-                    `;
-                }
-                const boxHTML = `<div class="box-wrapper bg-white rounded-xl shadow-md cursor-pointer category-box-animate" data-group="${group}" style="animation-delay: ${(index + 1) * 50}ms">
+                 let extraClasses = '';
+                 let textClass = 'text-slate-800'; // Default text
+
+                 if (group === 'Document Manager') {
+                     extraClasses = 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'; // Apply gradient
+                     textClass = 'text-white'; // Change text to white for contrast
+                     statsHTML = `<p class="text-xs ${textClass} opacity-80 mt-1">Central repository</p>`; // Simple text for Doc Manager
+                 } else {
+                      extraClasses = 'bg-white'; // Default background
+                      statsHTML = `
+                            <div class="flex justify-between items-center text-xs font-medium text-slate-600">
+                               <span>Filed: <span class="font-bold">${stats.filed}</span></span>
+                               <span>Pending: <span class="font-bold">${stats.total - stats.filed}</span></span>
+                            </div>
+                            <div class="w-full bg-black/10 rounded-full h-1.5 mt-2"><div class="${colors.bg} h-1.5 rounded-full" style="width: ${stats.total > 0 ? (stats.filed / stats.total) * 100 : 0}%"></div></div>
+                        `;
+                 }
+
+                const boxHTML = `<div class="box-wrapper rounded-xl shadow-md cursor-pointer category-box-animate ${extraClasses}" data-group="${group}" style="animation-delay: ${(index + 1) * 50}ms">
                     <div class="p-4 h-full flex flex-col justify-between z-10 relative">
                          <div>
                             <div class="flex items-start justify-between gap-2">
-                                <h3 class="text-base font-bold">${group}</h3>
-                                <p class="text-2xl font-extrabold text-slate-800">${stats.total}</p>
+                                <h3 class="text-base font-bold ${textClass}">${group}</h3>
+                                <p class="text-2xl font-extrabold ${textClass}">${stats.total}</p>
                             </div>
                         </div>
                         <div class="mt-4">
                            ${statsHTML}
                         </div>
                     </div>
-                    ${getIconForCategory(group)}
+                     ${getIconForCategory(group).replace('text-gray-200', group === 'Document Manager' ? 'text-indigo-200' : 'text-gray-200')}
                 </div>`;
                 categoryBoxesContainer.insertAdjacentHTML('beforeend', boxHTML);
             });
 
             categoryBoxesContainer.querySelector('[data-category="all"]').addEventListener('click', (e) => showTaskView(e.currentTarget, data.filter(d => d.group !== 'Document Manager')));
             categoryBoxesContainer.querySelectorAll('[data-group]').forEach(el => el.addEventListener('click', (e) => {
-                buildCategoryBoxes(data, e.currentTarget.dataset.group)
+                 // When clicking a group, call buildCategoryBoxes with the filter and isMainView = false
+                 buildCategoryBoxes(data, e.currentTarget.dataset.group, false);
             }));
         }
     };
-    
+
+    // --- Bird's Eye View Function ---
+    const buildBirdEyeView = (data) => {
+        if (!birdEyeViewContainer) return;
+
+         // Updated Task Name
+        const targetTasks = [
+            "GSTR 1", "GSTR 3B", "EPF Challan and ECR", "ESIC Return",
+            "TDS Challan", "TDS Return", "IGCR Form 3", "Advance Tax" // Changed here
+        ];
+
+        // Filter data for relevant tasks - Robust matching
+         const targetTasksLower = targetTasks.map(t => t.trim().toLowerCase());
+         const filteredData = data.filter(item => {
+             // Check if item.name exists and is a string before processing
+             return item.name && typeof item.name === 'string' && targetTasksLower.includes(item.name.trim().toLowerCase());
+         });
+
+
+        if (filteredData.length === 0) {
+            birdEyeViewContainer.innerHTML = ''; // Hide if no relevant data
+            return;
+        }
+
+        // Get unique periods and sort them
+        const allPeriods = [...new Set(filteredData.map(item => item.period))].filter(Boolean);
+         // Sort periods robustly, handling potential nulls from parsing
+         const sortedPeriods = allPeriods.sort((a, b) => {
+             const dateA = safeParseDate(a);
+             const dateB = safeParseDate(b);
+             if (dateA && dateB) return dateA - dateB;
+             if (dateA) return -1; // Place valid dates before invalid ones
+             if (dateB) return 1;
+             return 0; // Keep order if both are invalid
+         });
+
+
+        // Build Header Row
+        const headerCells = sortedPeriods.map(p => {
+            const formatted = formatPeriod(p); // Use the robust formatter
+            return `<th title="${formatted}">${formatted}</th>`;
+        }).join('');
+        const headerHTML = `<tr><th class="task-name-col">Task Name</th>${headerCells}</tr>`;
+
+        // Build Data Rows
+         const bodyRows = targetTasks.map(taskName => {
+             const taskNameLower = taskName.trim().toLowerCase(); // Normalize target task name once
+             const cells = sortedPeriods.map(period => {
+                 // Find task - using normalized names and period
+                 const task = filteredData.find(item =>
+                     item.name && typeof item.name === 'string' &&
+                     item.name.trim().toLowerCase() === taskNameLower &&
+                     item.period === period // Match the adjusted period date string
+                 );
+
+                 // --- Robust status check ---
+                 const status = task && task.status && typeof task.status === 'string'
+                                  ? task.status.trim().toLowerCase()
+                                  : 'n/a';
+                 let className = 'status-na';
+                 if (status === 'filed') className = 'status-filed';
+                 else if (status === 'pending') className = 'status-pending';
+                 // --- End of status check ---
+
+                 let title = `Task: ${taskName}\nPeriod: ${formatPeriod(period)}\nStatus: ${task && task.status ? task.status : 'N/A'}`;
+
+                 // Store data in the div for the click event
+                 return `<td class="bird-eye-cell ${className}"
+                                 data-task='${task ? JSON.stringify(task).replace(/'/g, '&apos;') : 'null'}'
+                                 data-task-name="${taskName}"
+                                 data-period="${formatPeriod(period)}"
+                                 title="${title.replace(/"/g, '&quot;')}">
+                             </td>`;
+             }).join('');
+             return `<tr><td class="task-name-col">${taskName}</td>${cells}</tr>`; // Display original task name
+         }).join('');
+
+
+        // Assemble the final HTML
+        birdEyeViewContainer.innerHTML = `
+            <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-3">
+                <svg class="w-6 h-6 text-indigo-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M11.078 2.296A.75.75 0 0112 2.296c.722 0 1.396.353 1.802.946l2.96 4.673c.404.636.564 1.347.41 2.038l-.782 3.513a.75.75 0 01-.64.64L7.802 12c-.524-.117-.923-.585-.923-1.125V6.444c0-.524.399-.993.923-1.125l3.155-.705a.75.75 0 01.125-.018zM15 16.638C15 14.871 13.567 13 11.75 13H5.378a.75.75 0 01-.714-1.004l1.248-3.56c.12-.34.42-.58.78-.654L11 7.25c.524 0 .923.47 1.004 1.004l.117.75c.12.75 1.004 2.125 1.625 2.125h.391c1.875 0 2.25 1.562 2.25 3.375s-2.25 3.375-2.25 3.375H12c-.75 0-1.5-.562-1.5-1.25S11.25 16 11.25 16h-.75V15.75a.75.75 0 011.5 0V16a.75.75 0 00.75.75h.39c.625 0 1.25-.562 1.25-1.25zM6.5 20.25a.75.75 0 01-.75-.75v-1.5a.75.75 0 011.5 0v1.5a.75.75 0 01-.75.75zM17.5 20.25a.75.75 0 01-.75-.75v-1.5a.75.75 0 011.5 0v1.5a.75.75 0 01-.75.75zM10.25 20.25a.75.75 0 01-.75-.75v-1.5a.75.75 0 011.5 0v1.5a.75.75 0 01-.75.75z" clip-rule="evenodd" /></svg>
+                Compliance Overview
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="bird-eye-table">
+                    <thead>${headerHTML}</thead>
+                    <tbody>${bodyRows}</tbody>
+                </table>
+            </div>
+        `;
+
+        // Add event listeners for the new clickable cells
+        birdEyeViewContainer.querySelectorAll('.bird-eye-cell').forEach(cell => {
+            cell.addEventListener('click', (e) => {
+                const taskData = e.currentTarget.dataset.task;
+                if (taskData && taskData !== 'null') {
+                    const task = JSON.parse(taskData.replace(/&apos;/g, "'"));
+                    modalTitle.innerHTML = `<svg class="w-6 h-6 text-slate-700" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" /></svg><span>Task Details</span>`;
+
+                    // --- Modal Body Style (Inner content kept opaque) ---
+                    modalBody.innerHTML = `
+                        <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200">
+                            <div class="p-4">
+                                <div class="flex justify-between items-center">
+                                    <h4 class="font-bold text-slate-800">${task.name}</h4>
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${task.status && task.status.trim().toLowerCase() === 'filed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${task.status || 'N/A'}</span>
+                                </div>
+                                <p class="text-sm text-slate-500 mt-1">${task.description || 'No description available.'}</p>
+                                <div class="mt-4 pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-600">
+                                    <div><strong>Period:</strong> ${formatPeriod(task.period)}</div>
+                                    <div><strong>FY:</strong> ${task.fy || 'N/A'}</div>
+                                    <div><strong>Due Date:</strong> ${safeFormatDate(safeParseDate(task.duedate))}</div>
+                                    <div><strong>Category:</strong> ${task.category || 'N/A'}</div>
+                                </div>
+                                ${task.remarks ? `<div class="mt-4 pt-2 border-t border-slate-200"><strong class="text-sm text-slate-600">Remarks:</strong><div class="text-slate-700 whitespace-pre-wrap leading-relaxed text-sm mt-1">${parseRemarksForLinks(task.remarks)}</div></div>` : ''}
+                                ${task.filelink ? `<div class="mt-4 pt-2 border-t border-slate-200"><a href="${task.filelink}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:underline">View Attachment</a></div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                    // --- End Modal Body Style ---
+                    eventModal.classList.remove('hidden');
+                } else {
+                    // Task is N/A
+                    const taskName = e.currentTarget.dataset.taskName;
+                    const period = e.currentTarget.dataset.period;
+                    modalTitle.innerHTML = `<span>Task Not Found</span>`;
+                    modalBody.innerHTML = `<p>No task entry found for <strong>${taskName}</strong> for the period <strong>${period}</strong>.</p>`;
+                    eventModal.classList.remove('hidden');
+                }
+            });
+        });
+    };
+    // --- End of New Function ---
+
     const showTaskView = (clickedElement, data) => {
         const category = clickedElement.dataset.category;
         const parentGroup = clickedElement.dataset.parentGroup;
         const isAlreadyExpanded = taskDetailsSection.classList.contains('expanded');
-        
+
         document.querySelectorAll('[data-group], [data-category]').forEach(el => el.classList.remove('active'));
         clickedElement.classList.add('active');
-        
+
         if (category === 'all') {
             currentTaskDataForPagination = data;
         } else {
@@ -754,31 +1236,42 @@ function startApp() {
 
         const isDocManager = parentGroup === 'Document Manager';
         const viewTitle = isDocManager ? category : (category === 'all' ? 'All Compliances' : category);
-        
+
         if (isDocManager) {
             const docFilters = [...new Set(currentTaskDataForPagination.map(item => item.note).filter(Boolean))];
             const docFilterOptions = docFilters.map(f => `<option value="${f}">${f}</option>`).join('');
+
+            // Filter HTML structure - Adjusted width and padding for better mobile view
             const docFilterHTML = `
-                <div class="relative">
-                     <svg class="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
-                    <select id="doc-manager-filter" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 pl-10 shadow-sm">
+                <div class="relative w-full sm:w-auto flex-shrink">
+                    <svg class="w-4 h-4 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
+                    <select id="doc-manager-filter" class="w-full bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 pl-8 shadow-sm appearance-none pr-8"> <!-- Added pl-8, appearance-none, pr-8 -->
                         <option value="all">Select Person</option>
                         ${docFilterOptions}
                     </select>
+                     <svg class="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg> <!-- Chevron -->
                 </div>`;
 
-             taskDetailsSection.innerHTML = `<div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-                <h3 class="text-xl font-bold text-slate-700">${viewTitle}</h3>
-                <div class="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <input type="text" id="task-search-input" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm w-40" placeholder="Search by name...">
-                    ${docFilterHTML}
-                    <div class="flex items-center">
-                        <button id="export-csv-btn" class="ml-2 bg-transparent text-green-600 hover:bg-green-100 font-bold p-2.5 rounded-md transition" title="Export CSV">📄</button>
-                        <button id="close-task-view" class="ml-2 text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button>
-                    </div>
-                </div>
-            </div>
-            <div id="paginated-table-container"></div>`;
+             // Buttons HTML structure
+             const buttonsHTML = `
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button id="export-csv-btn" class="bg-transparent text-green-600 hover:bg-green-100 font-bold p-2.5 rounded-md transition" title="Export CSV">📄</button>
+                    <button id="close-task-view" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button>
+                </div>`;
+
+
+             // Main header structure - Adjusted flex properties for better wrapping and spacing on mobile
+             taskDetailsSection.innerHTML = `
+             <div class="flex flex-col sm:flex-row sm:flex-nowrap justify-between items-center mb-4 gap-4">
+                 <h3 class="text-xl font-bold text-slate-700 w-full sm:w-auto text-center sm:text-left flex-shrink-0">${viewTitle}</h3>
+                 <div class="flex flex-col sm:flex-row sm:flex-nowrap items-center gap-2 w-full sm:w-auto justify-end flex-grow"> <!-- Added flex-grow -->
+                     <input type="text" id="task-search-input" class="w-full sm:w-auto bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm flex-grow sm:flex-grow-0 flex-shrink min-w-[100px]" placeholder="Search by name..."> <!-- Adjusted flex properties and min-width -->
+                     ${docFilterHTML}
+                     ${buttonsHTML}
+                 </div>
+             </div>
+             <div id="paginated-table-container"></div>`;
+
             document.getElementById('doc-manager-filter').addEventListener('change', () => renderTaskPage(1, true));
             document.getElementById('task-search-input').addEventListener('input', () => renderTaskPage(1, true));
             renderTaskPage(1, true);
@@ -794,10 +1287,10 @@ function startApp() {
             const periodFilterHTML = `<select id="period-filter" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm"><option value="all">All Periods</option>${periodFilterOptions}</select>`;
             const statusFilterHTML = `<select id="status-filter" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm"><option value="all">All Status</option><option value="Pending">Pending</option><option value="Filed">Filed</option></select>`;
 
-            taskDetailsSection.innerHTML = `<div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4"><h3 class="text-xl font-bold text-slate-700">${viewTitle}</h3><div class="flex items-center gap-2 w-full md:w-auto justify-end"> <input type="text" id="task-search-input" class="bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm w-40" placeholder="Search by name...">${statusFilterHTML}${periodFilterHTML}<div class="flex items-center"><button id="get-ai-summary" class="bg-transparent text-purple-600 hover:bg-purple-100 font-bold p-2.5 rounded-md transition" title="Get AI Summary">✨</button><button id="export-csv-btn" class="ml-2 bg-transparent text-green-600 hover:bg-green-100 font-bold p-2.5 rounded-md transition" title="Export CSV">📄</button><button id="close-task-view" class="ml-2 text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button></div></div></div><div id="ai-summary-container" class="mb-4"></div><div id="paginated-table-container"></div>`;
-            
+            taskDetailsSection.innerHTML = `<div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4"><h3 class="text-xl font-bold text-slate-700">${viewTitle}</h3><div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end"> <input type="text" id="task-search-input" class="w-full sm:w-auto bg-white border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm" placeholder="Search by name...">${statusFilterHTML}${periodFilterHTML}<div class="flex items-center w-full sm:w-auto justify-end"><button id="get-ai-summary" class="bg-transparent text-purple-600 hover:bg-purple-100 font-bold p-2.5 rounded-md transition" title="Get AI Summary">✨</button><button id="export-csv-btn" class="ml-2 bg-transparent text-green-600 hover:bg-green-100 font-bold p-2.5 rounded-md transition" title="Export CSV">📄</button><button id="close-task-view" class="ml-2 text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button></div></div></div><div id="ai-summary-container" class="mb-4"></div><div id="paginated-table-container"></div>`;
+
             renderTaskPage(1, false);
-            
+
             document.getElementById('get-ai-summary').onclick = () => generateAiSummary(currentTaskDataForPagination);
             document.getElementById('period-filter').addEventListener('change', () => renderTaskPage(1, false));
             document.getElementById('status-filter').addEventListener('change', () => renderTaskPage(1, false));
@@ -808,7 +1301,7 @@ function startApp() {
         if (!isAlreadyExpanded) {
             taskDetailsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-        
+
         document.getElementById('close-task-view').onclick = () => { taskDetailsSection.classList.remove('expanded'); clickedElement.classList.remove('active'); };
         document.getElementById('export-csv-btn').onclick = () => exportToCSV(currentTaskDataForPagination, `${viewTitle}_export`);
     };
@@ -832,7 +1325,7 @@ function startApp() {
                 const decodedPart = decodeURIComponent(pathParts.pop() || '').trim();
                 if(decodedPart) filename = decodedPart;
             } catch (e) { /* Invalid URL, ignore filename extraction */ }
-            
+
             return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:underline flex items-center gap-1.5 my-2">
                         <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                         ${filename}
@@ -869,10 +1362,11 @@ function startApp() {
                 data = data.filter(item => formatPeriod(item.period) === selectedPeriod);
             }
             if (selectedStatus !== 'all') {
-                data = data.filter(item => item.status === selectedStatus);
+                // Robust status check for filtering
+                data = data.filter(item => item.status && item.status.trim().toLowerCase() === selectedStatus.toLowerCase());
             }
         }
-        
+
         const rowsPerPage = 10;
         const pageCount = Math.ceil(data.length / rowsPerPage) || 1;
         const container = document.getElementById('paginated-table-container');
@@ -880,7 +1374,7 @@ function startApp() {
         if (page < 1) page = 1; if (page > pageCount) page = pageCount;
         const start = (page - 1) * rowsPerPage;
         const paginatedItems = data.slice(start, start + rowsPerPage);
-        
+
         let tableHTML;
 
         if (isDocManager) {
@@ -902,16 +1396,34 @@ function startApp() {
                 </tbody>
             </table></div>`;
         } else {
-            const headers = ['Name','Period','Due Date','Status','Remarks','Attachment'];
-            tableHTML = `<div class="overflow-x-auto"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-100 border-b-2 border-slate-200"><tr>${headers.map(h=>`<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3">${h}</th>`).join('')}</tr></thead><tbody>${paginatedItems.length>0?paginatedItems.map(item=>`<tr class="bg-white border-b hover:bg-slate-50"><td class="px-3 py-2 sm:px-6 sm:py-4 font-medium text-slate-900 whitespace-nowrap">${item.name||''}</td><td class="px-3 py-2 sm:px-6 sm:py-4">${formatPeriod(item.period)}</td><td class="px-3 py-2 sm:px-6 sm:py-4">${safeFormatDate(safeParseDate(item.duedate))}</td><td class="px-3 py-2 sm:px-6 sm:py-4"><span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${item.status==='Filed'?'bg-green-100 text-green-800':'bg-yellow-100 text-yellow-800'}"><span class="h-1.5 w-1.5 rounded-full ${item.status==='Filed'?'bg-green-600':'bg-yellow-600'}"></span>${item.status}</span></td><td class="px-3 py-2 sm:px-6 sm:py-4">${item.remarks ? `<button class="view-remark-btn text-slate-600 hover:text-slate-900 flex items-center gap-1.5" data-remark="${item.remarks.replace(/"/g, '&quot;')}"><svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>View</button>` : '<span>-</span>'}</td><td class="px-3 py-2 sm:px-6 sm:py-4">${item.filelink?`<a href="${item.filelink}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:underline">Download</a>`:'<span>-</span>'}</td></tr>`).join(''):`<tr><td colspan="6" class="text-center p-8 text-slate-500">No tasks found.</td></tr>`}</tbody></table></div>`;
+             const headers = ['Name','Period','Due Date','Status','Remarks','Attachment'];
+             // Added robust status checking for class assignment
+             tableHTML = `<div class="overflow-x-auto"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-100 border-b-2 border-slate-200"><tr>${headers.map(h=>`<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3">${h}</th>`).join('')}</tr></thead><tbody>${paginatedItems.length > 0 ? paginatedItems.map(item => {
+                 const statusLower = item.status ? item.status.trim().toLowerCase() : '';
+                 const statusColorClass = statusLower === 'filed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+                 const statusDotClass = statusLower === 'filed' ? 'bg-green-600' : 'bg-yellow-600';
+                 return `<tr class="bg-white border-b hover:bg-slate-50">
+                             <td class="px-3 py-2 sm:px-6 sm:py-4 font-medium text-slate-900 whitespace-nowrap">${item.name || ''}</td>
+                             <td class="px-3 py-2 sm:px-6 sm:py-4">${formatPeriod(item.period)}</td>
+                             <td class="px-3 py-2 sm:px-6 sm:py-4">${safeFormatDate(safeParseDate(item.duedate))}</td>
+                             <td class="px-3 py-2 sm:px-6 sm:py-4">
+                                 <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${statusColorClass}">
+                                     <span class="h-1.5 w-1.5 rounded-full ${statusDotClass}"></span>
+                                     ${item.status || 'N/A'}
+                                 </span>
+                             </td>
+                             <td class="px-3 py-2 sm:px-6 sm:py-4">${item.remarks ? `<button class="view-remark-btn text-slate-600 hover:text-slate-900 flex items-center gap-1.5" data-remark="${item.remarks.replace(/"/g, '&quot;')}"><svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>View</button>` : '<span>-</span>'}</td>
+                             <td class="px-3 py-2 sm:px-6 sm:py-4">${item.filelink ? `<a href="${item.filelink}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:underline">Download</a>` : '<span>-</span>'}</td>
+                           </tr>`;
+             }).join('') : `<tr><td colspan="6" class="text-center p-8 text-slate-500">No tasks found.</td></tr>`}</tbody></table></div>`;
         }
-        
+
         let paginationHTML = '';
         if (pageCount > 1) paginationHTML = `<div class="mt-4 flex justify-between items-center text-sm text-slate-600"><div>Showing ${data.length>0?start+1:0} to ${Math.min(start+rowsPerPage,data.length)} of ${data.length} entries</div><div class="flex items-center gap-2"><button class="pagination-btn p-2 rounded-md bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed" data-page="${page-1}" ${page===1?'disabled':''}> <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" /></svg></button><span class="font-medium">Page ${page} of ${pageCount}</span><button class="pagination-btn p-2 rounded-md bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed" data-page="${page+1}" ${page===pageCount?'disabled':''}> <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg></button></div></div>`;
-        
+
         container.innerHTML = tableHTML + paginationHTML;
         container.querySelectorAll('.pagination-btn').forEach(button => button.addEventListener('click', (e) => renderTaskPage(parseInt(e.currentTarget.dataset.page), isDocManager)));
-        
+
         container.querySelectorAll('.view-remark-btn').forEach(button => {
             button.addEventListener('click', e => {
                 const remarkText = e.currentTarget.dataset.remark;
@@ -922,8 +1434,9 @@ function startApp() {
         });
     }
 
+    // --- Original exportToCSV Date Logic ---
     const exportToCSV = (dataToExport, filename) => {
-        if (!dataToExport || dataToExport.length === 0) { alert('No data to export.'); return; }
+        if (!dataToExport || dataToExport.length === 0) { alert('No data to export.'); return; } // Changed to alert
         const headers = ['Name', 'Category', 'FY', 'Description', 'Period', 'DueDate', 'Status'];
         const keys = ['name', 'category', 'fy', 'description', 'period', 'duedate', 'status'];
         const csvRows = [headers.join(',')];
@@ -931,12 +1444,14 @@ function startApp() {
             const values = keys.map(key => {
                 let cellValue = row[key] == null ? '' : String(row[key]);
                 if (key === 'duedate' || key === 'period') {
-                    const parsedDate = safeParseDate(cellValue);
-                    if(parsedDate) {
+                    // Revert to original logic: Parse, subtract day, format
+                    const parsedDate = safeParseDate(row[key]); // Use original potentially adjusted value from fetchData
+                    if (parsedDate) {
+                        // Subtract one day before formatting for CSV
                         parsedDate.setUTCDate(parsedDate.getUTCDate() - 1);
-                        cellValue = parsedDate.toISOString().split('T')[0];
+                        cellValue = parsedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
                     } else {
-                        cellValue = '';
+                        cellValue = ''; // Handle invalid dates
                     }
                 }
                 let escaped = cellValue.replace(/"/g, '""');
@@ -951,18 +1466,25 @@ function startApp() {
         link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
     };
-    
+    // --- End Original exportToCSV Date Logic ---
+
+    // --- Calendar Date Logic ---
     const initializeSmallCalendar = () => {
         smallCalendarInstance = new FullCalendar.Calendar(document.getElementById('small-calendar'), {
             initialView: 'dayGridMonth',
-            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            headerToolbar: {
+                left: 'prev',
+                center: 'title',
+                right: 'next'
+            },
             height: 'auto',
             dateClick: (info) => {
-                const clickedDate = info.date; 
+                const clickedDate = info.date; // FullCalendar Date object (local timezone)
                 const calendarData = getFilteredData().filter(item => item.group !== 'Document Manager');
                 const eventsOnDate = calendarData.filter(e => {
-                    const eventDate = safeParseDate(e.duedate); 
+                    const eventDate = safeParseDate(e.duedate); // Get UTC Date object
                     if (!eventDate) return false;
+                    // Compare UTC year, month, and day
                     return eventDate.getUTCFullYear() === clickedDate.getFullYear() &&
                            eventDate.getUTCMonth() === clickedDate.getMonth() &&
                            eventDate.getUTCDate() === clickedDate.getDate();
@@ -986,28 +1508,31 @@ function startApp() {
                 }
             },
             dayCellContent: (arg) => {
-                const calDate = arg.date; 
+                const cellDate = arg.date; // FullCalendar Date object (local timezone)
                 const calendarData = getFilteredData().filter(item => item.group !== 'Document Manager');
                 const eventsOnDate = calendarData.filter(e => {
-                    const eventDate = safeParseDate(e.duedate);
+                    const eventDate = safeParseDate(e.duedate); // Get UTC Date object
                     if (!eventDate) return false;
-                    return eventDate.getUTCFullYear() === calDate.getFullYear() &&
-                           eventDate.getUTCMonth() === calDate.getMonth() &&
-                           eventDate.getUTCDate() === calDate.getDate();
+                    // Compare UTC year, month, day
+                    return eventDate.getUTCFullYear() === cellDate.getFullYear() &&
+                           eventDate.getUTCMonth() === cellDate.getMonth() &&
+                           eventDate.getUTCDate() === cellDate.getDate();
                 });
+
+                // This now relies on the CSS to position the number and the dot
+                let contentHTML = `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div>`;
                 if(eventsOnDate.length > 0){
-                    const categories = [...new Set(eventsOnDate.map(e => e.category))];
-                    const color = categories.length > 1 ? getCategoryColor('default', 'bg') : getCategoryColor(categories[0], 'bg');
-                    return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div><div class="${color.replace('border', 'bg')} w-2 h-2 rounded-full mx-auto mt-1"></div>` };
+                    contentHTML += `<div class="fc-daygrid-day-events"><span class="fc-event-dot"></span></div>`; // Add a dot for events
                 }
-                return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div>` };
+                return { html: contentHTML };
             }
         });
         smallCalendarInstance.render();
     };
+    // --- End Calendar Date Logic ---
 
-    const updateCalendar = (cal) => { if (cal) cal.render(); };
-    
+    const updateCalendar = (cal) => { if (cal) cal.render(); }; // Render should be enough if data changes trigger buildUI
+
     const showTooltip = (e) => {
         e.stopPropagation();
         const icon = e.currentTarget;
@@ -1029,14 +1554,14 @@ function startApp() {
             container.innerHTML = `<div class="p-3 bg-red-100 text-red-700 text-sm rounded-lg"><strong>AI Error:</strong> API Key not provided. Please add your key to the script to enable this feature.</div>`;
             return;
         }
-        
+
         container.innerHTML = `<div class="p-3 bg-blue-50 text-blue-700 text-sm rounded-lg animate-pulse">✨ Generating summary...</div>`;
-        
+
         try {
             const prompt = `You are a compliance assistant for an Indian company. Based on the following JSON data of compliance tasks, provide a concise, bulleted summary for a manager. Highlight the number of pending vs. filed tasks, mention any upcoming critical due dates (within the next 15 days) for pending items, and point out if anything is overdue. Today's date is ${new Date().toDateString()}. The data is: ${JSON.stringify(taskData)}`;
             const result = await aiModel.generateContent(prompt);
             let text = result.response.text();
-            
+
             text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\* (.*?)(?=\n\*|\n\n|$)/g, '<li>$1</li>').replace(/(\r\n|\n|\r)/gm, "<br>").replace(/<li>/g, '<li class="ml-4 list-disc">');
 
             container.innerHTML = `<div class="p-4 bg-purple-50 text-purple-900 text-sm rounded-lg border border-purple-200">${text}</div>`;
@@ -1074,7 +1599,7 @@ function startApp() {
             resultContainer.innerHTML = `<p class="text-red-600 text-xs">Could not suggest steps.</p>`;
         }
     }
-    
+
     initializeDashboard();
 }
 </script>
